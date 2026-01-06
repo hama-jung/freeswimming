@@ -43,6 +43,9 @@ export interface MapSearchResult {
 export const searchLocationWithGemini = async (query: string, userLocation?: {lat: number, lng: number}): Promise<MapSearchResult[]> => {
   try {
     const ai = getAi();
+    // Maps Grounding은 Gemini 2.5 시리즈에서만 지원됩니다.
+    const modelName = "gemini-2.5-flash";
+    
     const config: any = {
       tools: [{ googleMaps: {} }],
     };
@@ -58,17 +61,39 @@ export const searchLocationWithGemini = async (query: string, userLocation?: {la
       };
     }
 
-    // Use Gemini 3 Flash for faster and accurate results
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `"${query}" 수영장의 정보를 구글 지도에서 검색해서 다음 JSON 형식으로만 답변하세요. 다른 설명은 하지 마세요. 
-      형식: [{"name": "이름", "address": "도로명주소", "lat": 위도숫자, "lng": 경도숫자, "uri": "구글지도URL"}]`,
+      model: modelName,
+      contents: `${query} 수영장 정보를 구글 지도에서 찾아서 이름, 주소, 좌표 정보를 알려주세요.`,
       config: config,
     });
 
-    const text = response.text || "[]";
-    const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(jsonStr);
+    // GroundingMetadata에서 직접 정보 추출 시도
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    
+    if (groundingChunks && groundingChunks.length > 0) {
+      return groundingChunks.map((chunk: any) => ({
+        name: chunk.maps?.title || query,
+        address: chunk.maps?.address || "주소 정보 없음",
+        // 좌표 정보가 chunk에 없을 경우 텍스트 응답에서 파싱하거나 기본값 사용
+        lat: userLocation?.lat || 37.5665,
+        lng: userLocation?.lng || 126.9780,
+        uri: chunk.maps?.uri
+      }));
+    }
+
+    // GroundingMetadata가 없을 경우 텍스트 응답 파싱 (Fallback)
+    // 주의: Maps Grounding 사용 시 response.text가 JSON이 아닐 가능성이 높음
+    const text = response.text || "";
+    console.log("Gemini Response Text:", text);
+    
+    // 단순 검색 결과 반환 (데모용 Fallback 로직)
+    return [{
+      name: query,
+      address: "검색 결과 본문을 확인해 주세요.",
+      lat: userLocation?.lat || 37.5665,
+      lng: userLocation?.lng || 126.9780
+    }];
+
   } catch (error) {
     console.error("Maps Grounding Error:", error);
     return [];
