@@ -63,39 +63,44 @@ export const searchLocationWithGemini = async (query: string, userLocation?: {la
 
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: `${query} 수영장 정보를 구글 지도에서 찾아서 이름, 주소, 좌표 정보를 알려주세요.`,
+      contents: `${query} 수영장의 이름, 정확한 도로명 주소, 그리고 위도와 경도 좌표 정보를 구글 지도 데이터를 참조하여 알려주세요.`,
       config: config,
     });
 
-    // GroundingMetadata에서 직접 정보 추출 시도
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+    const groundingChunks = groundingMetadata?.groundingChunks;
     
-    if (groundingChunks && groundingChunks.length > 0) {
-      return groundingChunks.map((chunk: any) => ({
-        name: chunk.maps?.title || query,
-        address: chunk.maps?.address || "주소 정보 없음",
-        // 좌표 정보가 chunk에 없을 경우 텍스트 응답에서 파싱하거나 기본값 사용
-        lat: userLocation?.lat || 37.5665,
-        lng: userLocation?.lng || 126.9780,
-        uri: chunk.maps?.uri
-      }));
+    // 1. 구글 지도 도구의 직접적인 응답(chunks)이 있는 경우
+    if (groundingChunks && Array.isArray(groundingChunks)) {
+      const results = groundingChunks
+        .filter((chunk: any) => chunk.maps) // maps 데이터가 있는 청크만 필터링
+        .map((chunk: any) => ({
+          name: chunk.maps.title || query,
+          address: chunk.maps.address || "주소 정보 없음",
+          // 지도 정보가 없을 경우 사용자의 현재 위치나 기본 서울 좌표 사용
+          lat: userLocation?.lat || 37.5665,
+          lng: userLocation?.lng || 126.9780,
+          uri: chunk.maps.uri
+        }));
+
+      if (results.length > 0) return results;
     }
 
-    // GroundingMetadata가 없을 경우 텍스트 응답 파싱 (Fallback)
-    // 주의: Maps Grounding 사용 시 response.text가 JSON이 아닐 가능성이 높음
+    // 2. 직접적인 청크는 없지만 텍스트 응답이 있는 경우 (AI의 지식 활용)
     const text = response.text || "";
-    console.log("Gemini Response Text:", text);
-    
-    // 단순 검색 결과 반환 (데모용 Fallback 로직)
-    return [{
-      name: query,
-      address: "검색 결과 본문을 확인해 주세요.",
-      lat: userLocation?.lat || 37.5665,
-      lng: userLocation?.lng || 126.9780
-    }];
+    if (text.length > 10) {
+      return [{
+        name: query,
+        address: text.split('\n')[0].substring(0, 100), // 텍스트 첫 줄을 주소로 가정
+        lat: userLocation?.lat || 37.5665,
+        lng: userLocation?.lng || 126.9780
+      }];
+    }
 
+    return [];
   } catch (error) {
     console.error("Maps Grounding Error:", error);
+    // 에러 발생 시 빈 배열 반환하여 컴포넌트에서 경고창을 띄우게 함
     return [];
   }
 };
