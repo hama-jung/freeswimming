@@ -2,7 +2,7 @@
 import { Pool, Region } from "./types";
 
 export const REGIONS: Region[] = [
-  "전체", "서울", "경기", "인천", "부산", "대구", "광주", "대전", "울산", "강원", "경남", "경북", "전남", "전북", "충남", "충북", "제주"
+  "전체", "서울", "경기", "인천", "세종", "부산", "대구", "광주", "대전", "울산", "강원", "경남", "경북", "전남", "전북", "충남", "충북", "제주"
 ];
 
 export const MOCK_POOLS: Pool[] = [
@@ -107,7 +107,6 @@ export const MOCK_POOLS: Pool[] = [
     hasWalkingLane: false,
     extraFeatures: "",
     freeSwimSchedule: [
-        // 테스트를 위해 종료 시간을 09:00으로 수정함
         { day: "평일(월-금)", startTime: "06:00", endTime: "09:00" },
     ],
     fees: [

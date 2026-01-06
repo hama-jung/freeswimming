@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, MapPin, Phone, Calendar, Star, Edit2, MessageSquare, Sparkles, Trash2, UserCheck, ExternalLink, Map as MapIcon, CheckCircle2, Waves, Thermometer } from 'lucide-react';
+import { X, MapPin, Phone, Calendar, Star, Edit2, MessageSquare, Sparkles, Trash2, UserCheck, ExternalLink, Map as MapIcon, CheckCircle2, Waves, Thermometer, AlertCircle } from 'lucide-react';
 import { Pool, Review } from '../types';
 import { generatePoolSummary } from '../services/geminiService';
 
@@ -55,6 +55,8 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                    pool.closedDays === 'EVERY_MON' ? '매주 월요일' : 
                    pool.closedDays === 'EVERY_SUN' ? '매주 일요일' : 
                    pool.closedDays === 'SUN_2_4' ? '2, 4주 일요일' : pool.closedDays;
+
+  const { holidayOptions } = pool;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
@@ -167,6 +169,22 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                   <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">정기 휴무일</h4>
                     <p className="text-sm font-bold text-red-500">{holidayLabel}</p>
+                    
+                    {/* 공휴일/임시공휴일 배지 추가 */}
+                    {(holidayOptions?.publicHolidayEnabled || holidayOptions?.temporaryHolidayEnabled) && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {holidayOptions.publicHolidayEnabled && (
+                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-red-50 text-red-600 rounded-md font-bold border border-red-100">
+                            <AlertCircle className="w-2.5 h-2.5" /> 공휴일 휴무
+                          </span>
+                        )}
+                        {holidayOptions.temporaryHolidayEnabled && (
+                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-red-50 text-red-600 rounded-md font-bold border border-red-100">
+                            <AlertCircle className="w-2.5 h-2.5" /> 임시공휴일 휴무
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

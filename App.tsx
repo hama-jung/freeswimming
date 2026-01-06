@@ -43,7 +43,6 @@ function isPoolAvailableNow(pool: Pool): boolean {
 
 function App() {
   const [view, setView] = useState<'list' | 'form'>('list');
-  // 기본 디스플레이 모드를 'list'로 설정
   const [displayMode, setDisplayMode] = useState<'map' | 'list'>('list');
   const [pools, setPools] = useState<Pool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,7 +142,7 @@ function App() {
         </div>
       )}
 
-      {/* Header - Centered 1280px */}
+      {/* Header */}
       <header className="h-20 px-6 glass border-b border-slate-200 shrink-0 z-40 flex justify-center">
         <div className="w-full max-w-[1280px] flex items-center justify-between">
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => window.location.reload()}>
@@ -178,7 +177,7 @@ function App() {
         </div>
       </header>
 
-      {/* Search & Filter Bar - Centered 1280px */}
+      {/* Search & Filter Bar */}
       <div className="bg-white border-b border-slate-100 z-30 shrink-0 flex flex-col items-center">
         <div className="w-full max-w-[1280px] px-6 py-12 flex flex-col gap-10">
           <div className="flex flex-col md:flex-row items-stretch gap-6 justify-center">
@@ -209,21 +208,23 @@ function App() {
             </div>
           </div>
           
-          <div className="flex w-full overflow-x-auto no-scrollbar gap-4 justify-start sm:justify-center">
+          {/* 가로 스크롤 레이아웃 버그 수정: md:justify-center 제거 및 충분한 왼쪽 여백 확보 */}
+          <div className="flex w-full overflow-x-auto gap-3 pb-4 px-2 justify-start scrollbar-thin scrollbar-thumb-slate-300 scroll-smooth">
             {REGIONS.map(r => (
               <button 
                 key={r} 
                 onClick={() => setSelectedRegion(r)}
-                className={`h-14 px-8 shrink-0 rounded-2xl font-black text-lg transition-all border-2 ${selectedRegion === r ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-100' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
+                className={`h-14 px-8 shrink-0 rounded-2xl font-black text-lg transition-all border-2 whitespace-nowrap ${selectedRegion === r ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-100' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
               >
                 {r}
               </button>
             ))}
+            {/* 우측 끝 공간 확보를 위한 더미 요소 */}
+            <div className="w-8 shrink-0"></div>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area - Centered Content */}
       <main className="flex-1 relative overflow-hidden flex flex-col items-center">
         {displayMode === 'map' ? (
           <div className="absolute inset-0">
@@ -262,7 +263,6 @@ function App() {
         )}
       </main>
 
-      {/* Mobile Display Toggle Button (Float) */}
       <div className="sm:hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-xl text-white rounded-[40px] shadow-2xl p-2.5 flex items-center border border-white/10">
         <button 
           onClick={() => setDisplayMode('map')}

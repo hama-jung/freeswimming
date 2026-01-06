@@ -37,66 +37,64 @@ export interface MapSearchResult {
   address: string;
   lat: number;
   lng: number;
-  uri?: string;
 }
 
 export const searchLocationWithGemini = async (query: string, userLocation?: {lat: number, lng: number}): Promise<MapSearchResult[]> => {
   try {
     const ai = getAi();
-    // 검색 기능을 가장 잘 지원하는 2.5 flash 모델 사용
-    const modelName = "gemini-2.5-flash";
+    const modelName = "gemini-3-pro-preview"; // 좌표 추출 정확도를 위해 Pro 모델 권장
     
-    console.log(`Searching for "${query}" swimming pool...`);
-
-    // 스크린샷에서 활성화가 확인된 googleSearch 도구 사용
-    const config: any = {
+    const config = {
       tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING, description: "Official swimming pool name" },
+            address: { type: Type.STRING, description: "Full road address in Korea" },
+            lat: { type: Type.NUMBER, description: "Latitude coordinate" },
+            lng: { type: Type.NUMBER, description: "Longitude coordinate" }
+          },
+          required: ["name", "address", "lat", "lng"]
+        }
+      }
     };
+
+    const prompt = `Find the exact road address and GPS coordinates (latitude, longitude) of "${query}" swimming pool in South Korea. 
+    Current user location is approx: ${userLocation ? `${userLocation.lat}, ${userLocation.lng}` : "unknown"}. 
+    Provide real coordinates, not placeholders.`;
 
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: `Find the official name and exact road address of "${query}" swimming pool in South Korea. 
-      I need the information to register it in my app. 
-      Please answer in this format: "NAME: [Pool Name], ADDRESS: [Full Road Address]"`,
+      contents: prompt,
       config: config,
     });
 
-    console.log("Raw Search Response:", response.text);
-
-    const results: MapSearchResult[] = [];
-    const text = response.text || "";
-
-    // 1. 텍스트에서 정보 추출 (가장 확실한 방법)
-    const nameMatch = text.match(/NAME:\s*([^\n,]+)/i);
-    const addressMatch = text.match(/ADDRESS:\s*([^\n.]+)/i);
-
-    if (nameMatch && addressMatch) {
-      results.push({
-        name: nameMatch[1].trim(),
-        address: addressMatch[1].trim(),
-        lat: userLocation?.lat || 37.5665,
-        lng: userLocation?.lng || 126.9780
-      });
-    } else if (text.length > 10) {
-      // 형식이 안 맞아도 텍스트가 있으면 첫 줄을 이름, 나머지를 주소로 추측
-      const lines = text.split('\n').filter(l => l.trim());
-      results.push({
-        name: lines[0].replace(/NAME:|ADDRESS:/gi, '').trim(),
-        address: (lines[1] || lines[0]).replace(/NAME:|ADDRESS:/gi, '').trim(),
-        lat: userLocation?.lat || 37.5665,
-        lng: userLocation?.lng || 126.9780
-      });
-    }
-
-    // 2. 검색 결과 출처(Sources)가 있다면 로그에 남김 (사용자 디버깅용)
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-    if (groundingMetadata?.groundingChunks) {
-      console.log("Grounding Sources found:", groundingMetadata.groundingChunks);
-    }
-
+    const results = JSON.parse(response.text || "[]");
     return results;
   } catch (error: any) {
     console.error("Gemini Search Error:", error.message);
     return [];
   }
 };
+
+/**
+ * 특정 주소에 대한 좌표를 가져오는 함수
+ */
+export const getCoordinatesFromAddress = async (address: string): Promise<{lat: number, lng: number} | null> => {
+    try {
+        const ai = getAi();
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Find the GPS coordinates (lat, lng) for the following address in South Korea: "${address}". 
+            Respond ONLY with a JSON object: {"lat": number, "lng": number}`,
+            config: { responseMimeType: "application/json" }
+        });
+        return JSON.parse(response.text || "null");
+    } catch (e) {
+        console.error("Coordinate fetch error:", e);
+        return null;
+    }
+}
