@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Waves, LocateFixed, CalendarCheck, PlusCircle, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon } from 'lucide-react';
-import { Pool, Region } from './types';
+import { Pool, Region, DayType } from './types';
 import { MOCK_POOLS, REGIONS } from './constants';
 import PoolCard from './components/PoolCard';
 import PoolDetail from './components/PoolDetail';
@@ -27,12 +27,20 @@ function isPoolAvailableNow(pool: Pool): boolean {
   if (closed.includes("매주 월요일") && day === 1) return false;
   if (closed.includes("매주 일요일") && day === 0) return false;
 
-  let dayType: any = "평일(월-금)";
-  if (day === 0) dayType = "일요일";
-  else if (day === 6) dayType = "토요일";
+  const isWeekend = (day === 0 || day === 6);
+  
+  const schedules = pool.freeSwimSchedule;
+  
+  // 현재 요일에 맞는 스케줄 찾기
+  let possibleSchedules = schedules.filter(s => {
+    if (day === 0 && s.day === "일요일") return true;
+    if (day === 6 && s.day === "토요일") return true;
+    if (day >= 1 && day <= 5 && s.day === "평일(월-금)") return true;
+    if (isWeekend && s.day === "주말/공휴일") return true;
+    return false;
+  });
 
-  const schedule = pool.freeSwimSchedule.filter(s => s.day === dayType);
-  return schedule.some(s => {
+  return possibleSchedules.some(s => {
     const [startH, startM] = s.startTime.split(':').map(Number);
     const [endH, endM] = s.endTime.split(':').map(Number);
     const startMin = startH * 60 + startM;
@@ -208,8 +216,7 @@ function App() {
             </div>
           </div>
           
-          {/* 가로 스크롤 레이아웃 버그 수정: md:justify-center 제거 및 충분한 왼쪽 여백 확보 */}
-          <div className="flex w-full overflow-x-auto gap-3 pb-4 px-2 justify-start scrollbar-thin scrollbar-thumb-slate-300 scroll-smooth">
+          <div className="flex w-full overflow-x-auto gap-3 pb-4 px-6 justify-start scrollbar-thin scrollbar-thumb-slate-300 scroll-smooth">
             {REGIONS.map(r => (
               <button 
                 key={r} 
@@ -219,7 +226,6 @@ function App() {
                 {r}
               </button>
             ))}
-            {/* 우측 끝 공간 확보를 위한 더미 요소 */}
             <div className="w-8 shrink-0"></div>
           </div>
         </div>

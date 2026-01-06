@@ -2,7 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Pool } from "../types";
 
-const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Always use process.env.API_KEY directly for initialization.
+const getAi = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generatePoolSummary = async (pool: Pool): Promise<string> => {
   try {

@@ -8,7 +8,6 @@ export interface Review {
   date: string;
 }
 
-// Added User interface to resolve "has no exported member 'User'" errors in auth and UI components
 export interface User {
   id: string;
   email: string;
@@ -16,8 +15,8 @@ export interface User {
   joinedAt: string;
 }
 
-export type DayType = "평일(월-금)" | "토요일" | "일요일" | "공휴일";
-export type FeeCategory = "평일" | "주말/공휴일";
+export type DayType = "평일(월-금)" | "토요일" | "일요일" | "공휴일" | "주말/공휴일";
+export type FeeCategory = "평일" | "주말/공휴일" | "전체";
 
 export interface FreeSwimSchedule {
   day: DayType;
@@ -57,7 +56,7 @@ export interface Pool {
 
   freeSwimSchedule: FreeSwimSchedule[];
   fees: FeeInfo[];
-  closedDays: string; // JSON string of HolidayRule[] or descriptive string
+  closedDays: string;
   holidayOptions?: {
     regularHolidayEnabled: boolean;
     specificHolidayEnabled: boolean;

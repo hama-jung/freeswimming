@@ -2,14 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { Pool, Region } from '../types';
-
-interface KoreaMapProps {
-  pools: Pool[];
-  onSelectPool: (pool: Pool) => void;
-  userLocation: { lat: number, lng: number } | null;
-  selectedRegion: Region | "내주변";
-  onRequestLocation: () => void;
-}
+import { LocateFixed } from 'lucide-react';
 
 function checkPoolAvailability(pool: Pool): boolean {
   const now = new Date();
@@ -22,11 +15,17 @@ function checkPoolAvailability(pool: Pool): boolean {
   if (code.includes("매주 월요일") && day === 1) return false;
   if (code.includes("매주 일요일") && day === 0) return false;
 
-  let todayDayType: any = "평일(월-금)";
-  if (day === 0) todayDayType = "일요일";
-  else if (day === 6) todayDayType = "토요일";
+  const isWeekend = (day === 0 || day === 6);
+  
+  const schedules = pool.freeSwimSchedule;
+  const todaySchedules = schedules.filter(s => {
+    if (day === 0 && s.day === "일요일") return true;
+    if (day === 6 && s.day === "토요일") return true;
+    if (day >= 1 && day <= 5 && s.day === "평일(월-금)") return true;
+    if (isWeekend && s.day === "주말/공휴일") return true;
+    return false;
+  });
 
-  const todaySchedules = pool.freeSwimSchedule.filter(sch => sch.day === todayDayType);
   if (todaySchedules.length === 0) return false;
 
   return todaySchedules.some(sch => {
@@ -127,7 +126,6 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
     <div className="w-full h-full relative overflow-hidden">
       <div ref={mapRef} className="w-full h-full z-10" />
       
-      {/* 인터랙티브 범례 */}
       <div className="absolute top-4 left-4 z-[400] bg-white/95 backdrop-blur-xl p-4 rounded-2xl shadow-xl border border-slate-200 flex flex-col gap-3 min-w-[160px]">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-red-500 rounded-full ring-4 ring-red-100"></div>
@@ -162,7 +160,12 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
   );
 };
 
-// Import necessary lucide icons if not already globally available
-import { LocateFixed } from 'lucide-react';
+interface KoreaMapProps {
+  pools: Pool[];
+  onSelectPool: (pool: Pool) => void;
+  userLocation: { lat: number, lng: number } | null;
+  selectedRegion: Region | "내주변";
+  onRequestLocation: () => void;
+}
 
 export default KoreaMap;
