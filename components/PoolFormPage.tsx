@@ -145,14 +145,31 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       const results = await searchLocationWithGemini(searchQuery, userLoc);
       setSearchResults(results);
       if (results.length === 0) {
-          alert("구글 지도에서 해당 장소를 찾을 수 없습니다. 명칭을 더 정확하게 입력해주세요.");
+          alert("AI 검색으로 정보를 찾지 못했습니다. '주소 검색' 버튼을 눌러 수동으로 입력하거나 검색어를 더 구체적으로 바꿔주세요.");
       }
     } catch (error) {
       console.error(error);
-      alert("검색 중 오류가 발생했습니다. 다시 시도해주세요.");
+      alert("검색 중 오류가 발생했습니다. 다시 시도하거나 주소를 직접 입력해 주세요.");
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleManualAddressSearch = () => {
+    if (!(window as any).daum) return alert("주소 서비스 로드 중입니다. 잠시 후 다시 시도하세요.");
+    new (window as any).daum.Postcode({
+      oncomplete: (data: any) => {
+        setAddress(data.address);
+        setName(searchQuery || data.buildingName || "새 수영장");
+        // 좌표는 주소 검색 시 기본 좌표를 할당하고 사용자가 핀을 옮길 수 있게 해야 하지만, 
+        // 여기서는 기본 위치로 설정함.
+        setSelectedCoords({ lat: 37.5665, lng: 126.9780 });
+        
+        const province = data.sido;
+        const matchedRegion = REGIONS.find(r => province.includes(r));
+        if (matchedRegion) setRegion(matchedRegion as Region);
+      }
+    }).open();
   };
 
   const handleSelectLocation = (result: MapSearchResult) => {
@@ -172,7 +189,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !address.trim() || !selectedCoords) {
-      alert("지도를 통해 수영장을 검색하고 결과에서 장소를 선택해 주세요.");
+      alert("수영장 정보를 완성해 주세요. (AI 검색 또는 주소 검색을 통해 위치를 지정해야 합니다)");
       return;
     }
 
@@ -276,7 +293,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
             </h3>
 
             <div className="space-y-4">
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                     <div className="relative flex-1">
                         <input 
                             type="text" 
@@ -288,14 +305,23 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                         />
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
                     </div>
-                    <button 
-                        type="button"
-                        onClick={handleSearchLocation}
-                        className="bg-slate-800 text-white px-8 rounded-2xl font-bold hover:bg-slate-900 shadow-md transition-all flex items-center gap-2"
-                    >
-                        {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                        검색
-                    </button>
+                    <div className="flex gap-2 shrink-0">
+                      <button 
+                          type="button"
+                          onClick={handleSearchLocation}
+                          className="flex-1 sm:flex-none bg-slate-800 text-white px-6 rounded-2xl font-bold hover:bg-slate-900 shadow-md transition-all flex items-center justify-center gap-2"
+                      >
+                          {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                          AI 검색
+                      </button>
+                      <button 
+                          type="button"
+                          onClick={handleManualAddressSearch}
+                          className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 px-6 rounded-2xl font-bold hover:bg-slate-50 shadow-sm transition-all flex items-center justify-center gap-2"
+                      >
+                          주소 검색
+                      </button>
+                    </div>
                 </div>
 
                 {searchResults.length > 0 && (

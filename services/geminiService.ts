@@ -27,7 +27,7 @@ export const generatePoolSummary = async (pool: Pool): Promise<string> => {
 
     return response.text || "AI 분석을 불러올 수 없습니다.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Error (Summary):", error);
     return "AI 서비스 연결 상태가 좋지 않아 분석을 완료할 수 없습니다.";
   }
 };
@@ -43,64 +43,60 @@ export interface MapSearchResult {
 export const searchLocationWithGemini = async (query: string, userLocation?: {lat: number, lng: number}): Promise<MapSearchResult[]> => {
   try {
     const ai = getAi();
-    // Maps Grounding은 Gemini 2.5 시리즈에서만 지원됩니다.
+    // 검색 기능을 가장 잘 지원하는 2.5 flash 모델 사용
     const modelName = "gemini-2.5-flash";
     
-    const config: any = {
-      tools: [{ googleMaps: {} }],
-    };
+    console.log(`Searching for "${query}" swimming pool...`);
 
-    if (userLocation) {
-      config.toolConfig = {
-        retrievalConfig: {
-          latLng: {
-            latitude: userLocation.lat,
-            longitude: userLocation.lng
-          }
-        }
-      };
-    }
+    // 스크린샷에서 활성화가 확인된 googleSearch 도구 사용
+    const config: any = {
+      tools: [{ googleSearch: {} }],
+    };
 
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: `${query} 수영장의 이름, 정확한 도로명 주소, 그리고 위도와 경도 좌표 정보를 구글 지도 데이터를 참조하여 알려주세요.`,
+      contents: `Find the official name and exact road address of "${query}" swimming pool in South Korea. 
+      I need the information to register it in my app. 
+      Please answer in this format: "NAME: [Pool Name], ADDRESS: [Full Road Address]"`,
       config: config,
     });
 
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-    const groundingChunks = groundingMetadata?.groundingChunks;
-    
-    // 1. 구글 지도 도구의 직접적인 응답(chunks)이 있는 경우
-    if (groundingChunks && Array.isArray(groundingChunks)) {
-      const results = groundingChunks
-        .filter((chunk: any) => chunk.maps) // maps 데이터가 있는 청크만 필터링
-        .map((chunk: any) => ({
-          name: chunk.maps.title || query,
-          address: chunk.maps.address || "주소 정보 없음",
-          // 지도 정보가 없을 경우 사용자의 현재 위치나 기본 서울 좌표 사용
-          lat: userLocation?.lat || 37.5665,
-          lng: userLocation?.lng || 126.9780,
-          uri: chunk.maps.uri
-        }));
+    console.log("Raw Search Response:", response.text);
 
-      if (results.length > 0) return results;
-    }
-
-    // 2. 직접적인 청크는 없지만 텍스트 응답이 있는 경우 (AI의 지식 활용)
+    const results: MapSearchResult[] = [];
     const text = response.text || "";
-    if (text.length > 10) {
-      return [{
-        name: query,
-        address: text.split('\n')[0].substring(0, 100), // 텍스트 첫 줄을 주소로 가정
+
+    // 1. 텍스트에서 정보 추출 (가장 확실한 방법)
+    const nameMatch = text.match(/NAME:\s*([^\n,]+)/i);
+    const addressMatch = text.match(/ADDRESS:\s*([^\n.]+)/i);
+
+    if (nameMatch && addressMatch) {
+      results.push({
+        name: nameMatch[1].trim(),
+        address: addressMatch[1].trim(),
         lat: userLocation?.lat || 37.5665,
         lng: userLocation?.lng || 126.9780
-      }];
+      });
+    } else if (text.length > 10) {
+      // 형식이 안 맞아도 텍스트가 있으면 첫 줄을 이름, 나머지를 주소로 추측
+      const lines = text.split('\n').filter(l => l.trim());
+      results.push({
+        name: lines[0].replace(/NAME:|ADDRESS:/gi, '').trim(),
+        address: (lines[1] || lines[0]).replace(/NAME:|ADDRESS:/gi, '').trim(),
+        lat: userLocation?.lat || 37.5665,
+        lng: userLocation?.lng || 126.9780
+      });
     }
 
-    return [];
-  } catch (error) {
-    console.error("Maps Grounding Error:", error);
-    // 에러 발생 시 빈 배열 반환하여 컴포넌트에서 경고창을 띄우게 함
+    // 2. 검색 결과 출처(Sources)가 있다면 로그에 남김 (사용자 디버깅용)
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+    if (groundingMetadata?.groundingChunks) {
+      console.log("Grounding Sources found:", groundingMetadata.groundingChunks);
+    }
+
+    return results;
+  } catch (error: any) {
+    console.error("Gemini Search Error:", error.message);
     return [];
   }
 };
