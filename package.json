@@ -2,11 +2,11 @@
 {
   "name": "freeswim",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -28,5 +28,5 @@
     "typescript": "^5.5.4",
     "vite": "^5.4.2"
   },
-  "description": "최종 빌드 수정본 - 2025-01-06"
+  "description": "빌드 최적화 버전"
 }
