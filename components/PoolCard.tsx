@@ -28,7 +28,7 @@ const PoolCard: React.FC<PoolCardProps> = ({ pool, onClick, distance }) => {
         />
         <div className="absolute top-6 left-6 flex flex-col gap-3">
           <div className={`px-5 py-2 rounded-full text-sm font-black text-white shadow-xl backdrop-blur-md border border-white/20 ${pool.isAvailable ? 'bg-emerald-500/90' : 'bg-slate-500/90'}`}>
-            {pool.isAvailable ? '● 실시간 수영 가능' : '○ 이용 불가/휴무'}
+            {pool.isAvailable ? '● 이용가능' : '○ 이용불가'}
           </div>
         </div>
         {distance !== undefined && (

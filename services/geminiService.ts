@@ -43,7 +43,7 @@ export interface MapSearchResult {
 export const searchLocationWithGemini = async (query: string, userLocation?: {lat: number, lng: number}): Promise<MapSearchResult[]> => {
   try {
     const ai = getAi();
-    const modelName = "gemini-3-pro-preview"; // 좌표 추출 정확도를 위해 Pro 모델 권장
+    const modelName = "gemini-3-pro-preview"; 
     
     const config = {
       tools: [{ googleSearch: {} }],
@@ -53,19 +53,22 @@ export const searchLocationWithGemini = async (query: string, userLocation?: {la
         items: {
           type: Type.OBJECT,
           properties: {
-            name: { type: Type.STRING, description: "Official swimming pool name" },
+            name: { type: Type.STRING, description: "Official name of the facility" },
             address: { type: Type.STRING, description: "Full road address in Korea" },
-            lat: { type: Type.NUMBER, description: "Latitude coordinate" },
-            lng: { type: Type.NUMBER, description: "Longitude coordinate" }
+            lat: { type: Type.NUMBER, description: "Latitude" },
+            lng: { type: Type.NUMBER, description: "Longitude" }
           },
           required: ["name", "address", "lat", "lng"]
         }
       }
     };
 
-    const prompt = `Find the exact road address and GPS coordinates (latitude, longitude) of "${query}" swimming pool in South Korea. 
-    Current user location is approx: ${userLocation ? `${userLocation.lat}, ${userLocation.lng}` : "unknown"}. 
-    Provide real coordinates, not placeholders.`;
+    // 검색어에 '수영장'이 없는 경우 검색 품질을 위해 자동으로 추가하여 질문함
+    const searchQuery = query.includes('수영장') ? query : `${query} 수영장`;
+    const prompt = `Find the precise road address and GPS coordinates for "${searchQuery}" in South Korea using Google Search. 
+    If the exact name is not found, suggest the most relevant public swimming pools or sports centers in that area.
+    Current user approximate location for context: ${userLocation ? `${userLocation.lat}, ${userLocation.lng}` : "South Korea"}.
+    Ensure the coordinates are valid numbers for the South Korea region.`;
 
     const response = await ai.models.generateContent({
       model: modelName,
@@ -73,10 +76,19 @@ export const searchLocationWithGemini = async (query: string, userLocation?: {la
       config: config,
     });
 
-    const results = JSON.parse(response.text || "[]");
-    return results;
+    const text = response.text || "[]";
+    try {
+        const results = JSON.parse(text);
+        if (!Array.isArray(results) || results.length === 0) {
+           console.warn("Gemini Search returned no results for:", searchQuery);
+        }
+        return results;
+    } catch (parseError) {
+        console.error("JSON Parsing Error from Gemini Search:", text);
+        return [];
+    }
   } catch (error: any) {
-    console.error("Gemini Search Error:", error.message);
+    console.error("Gemini Search API Error:", error.message);
     return [];
   }
 };
@@ -89,7 +101,7 @@ export const getCoordinatesFromAddress = async (address: string): Promise<{lat: 
         const ai = getAi();
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Find the GPS coordinates (lat, lng) for the following address in South Korea: "${address}". 
+            contents: `Find the precise GPS coordinates (lat, lng) for this South Korean address: "${address}". 
             Respond ONLY with a JSON object: {"lat": number, "lng": number}`,
             config: { responseMimeType: "application/json" }
         });
