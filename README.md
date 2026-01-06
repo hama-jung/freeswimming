@@ -1,20 +1,17 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
 
-# Run and deploy your AI Studio app
+# 🏊‍♂️ 자유수영.kr - 전국 수영장 정보 서비스
 
-This contains everything you need to run your app locally.
+전국 수영장의 자유수영 시간, 요금, 휴무일 정보를 공유하고 AI 분석을 통해 최적의 수영 시간을 추천해주는 웹 어플리케이션입니다.
 
-View your app in AI Studio: https://ai.studio/apps/drive/18K42DM_ZAMiWUrH8sMzTeAefJzwxNvcM
+## 🚀 배포 정보 (Netlify)
+- **Framework**: Vite + React
+- **Build Command**: `npm run build`
+- **Publish Directory**: `dist`
 
-## Run Locally
+## ⚙️ 환경 변수 설정
+Netlify Dashboard -> Site settings -> Build & deploy -> Environment variables 에서 다음 항목을 추가하세요:
+- `API_KEY`: Google Gemini API Key
+- `SUPABASE_URL`: Supabase URL
+- `SUPABASE_KEY`: Supabase Anon Key
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+*최종 업데이트: 2025-01-06*
