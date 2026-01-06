@@ -11,7 +11,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    minify: 'terser',
+    minify: true, // 기본 esbuild 사용 (terser 설치 불필요)
     sourcemap: false,
   }
 });
