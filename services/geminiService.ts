@@ -2,22 +2,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Pool } from "../types";
 
-// API 키가 없을 경우를 대비한 안전한 초기화 함수
-// Fix: Use the correct initialization pattern for @google/genai
-const getAi = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    console.error("Gemini API Key is missing. Please set it in your environment variables.");
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
+// API 키를 환경 변수에서 직접 가져와 초기화합니다.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generatePoolSummary = async (pool: Pool): Promise<string> => {
   try {
-    const ai = getAi();
-    if (!ai) return "AI 분석 기능을 사용하려면 API 키 설정이 필요합니다.";
-
     const prompt = `
       당신은 수영 전문가 AI 어시스턴트입니다.
       다음 수영장 정보를 바탕으로 사용자에게 도움이 될만한 3줄 요약 분석을 제공해주세요.
@@ -31,13 +20,13 @@ export const generatePoolSummary = async (pool: Pool): Promise<string> => {
       리뷰 내용: ${pool.reviews.map(r => r.content).join(' / ')}
     `;
 
-    // Fix: Use ai.models.generateContent directly and model 'gemini-3-flash-preview'
+    // 가벼운 요약 작업에는 gemini-3-flash-preview 모델을 사용합니다.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
-    // Fix: Access response.text directly (property, not method)
+    // response.text는 메서드가 아닌 속성입니다.
     return response.text || "AI 분석을 불러올 수 없습니다.";
   } catch (error) {
     console.error("Gemini API Error (Summary):", error);
@@ -54,13 +43,10 @@ export interface MapSearchResult {
 
 export const searchLocationWithGemini = async (query: string, userLocation?: {lat: number, lng: number}): Promise<MapSearchResult[]> => {
   try {
-    const ai = getAi();
-    if (!ai) return [];
-
-    // Fix: Use recommended model for complex tasks
+    // 복잡한 추론 작업에는 gemini-3-pro-preview 모델을 사용합니다.
     const modelName = "gemini-3-pro-preview"; 
     
-    // Fix: Use correct search grounding configuration
+    // 검색 그라운딩 도구를 구성합니다.
     const config = {
       tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
@@ -85,14 +71,12 @@ export const searchLocationWithGemini = async (query: string, userLocation?: {la
     Current user approximate location for context: ${userLocation ? `${userLocation.lat}, ${userLocation.lng}` : "South Korea"}.
     Ensure the coordinates are valid numbers for the South Korea region.`;
 
-    // Fix: Use ai.models.generateContent with correctly defined model and config
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
       config: config,
     });
 
-    // Fix: Access response.text as a property
     const text = response.text || "[]";
     try {
         const results = JSON.parse(text);
@@ -109,10 +93,6 @@ export const searchLocationWithGemini = async (query: string, userLocation?: {la
 
 export const getCoordinatesFromAddress = async (address: string): Promise<{lat: number, lng: number} | null> => {
     try {
-        const ai = getAi();
-        if (!ai) return null;
-
-        // Fix: Use gemini-3-flash-preview and property access for .text
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: `Find the precise GPS coordinates (lat, lng) for this South Korean address: "${address}". 
