@@ -32,10 +32,7 @@ export const MOCK_POOLS: Pool[] = [
         { type: "child", category: "평일", price: 4000 }
     ],
     closedDays: "매월 둘째, 넷째 일요일",
-    reviews: [
-        { id: "r1", userId: "u1", userName: "물개", rating: 5, content: "물이 정말 깨끗하고 50m라 운동하기 좋아요.", date: "2024-05-01" },
-        { id: "r2", userId: "u2", userName: "수린이", rating: 4, content: "사람이 좀 많지만 시설은 최고입니다.", date: "2024-05-02" }
-    ]
+    reviews: []
   },
   {
     id: "2",
@@ -61,9 +58,7 @@ export const MOCK_POOLS: Pool[] = [
         { type: "child", category: "평일", price: 3000 }
     ],
     closedDays: "매주 월요일",
-    reviews: [
-         { id: "r3", userId: "u3", userName: "바다사자", rating: 5, content: "국제 경기장 규격이라 넓고 좋습니다.", date: "2024-04-20" }
-    ]
+    reviews: []
   },
   {
     id: "3",
@@ -113,8 +108,6 @@ export const MOCK_POOLS: Pool[] = [
         { type: "adult", category: "평일", price: 5000 },
     ],
     closedDays: "매월 첫째, 셋째 일요일",
-    reviews: [
-        { id: "r4", userId: "u4", userName: "분당주민", rating: 3, content: "셔틀버스가 있어서 편해요. 샤워실이 조금 붐빕니다.", date: "2024-05-10" }
-    ]
+    reviews: []
   }
 ];

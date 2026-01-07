@@ -60,7 +60,6 @@ export const getStoredPools = async (): Promise<Pool[]> => {
 
 export const savePool = async (pool: Pool): Promise<boolean> => {
   if (!supabase) {
-    // DB 없을 시 로컬스토리지에라도 저장
     const current = await getStoredPools();
     const updated = [pool, ...current.filter(p => p.id !== pool.id)];
     localStorage.setItem('swimming_app_universal_pools', JSON.stringify(updated));
@@ -98,6 +97,21 @@ export const savePool = async (pool: Pool): Promise<boolean> => {
     console.error("저장 실패:", e);
     return false;
   }
+};
+
+/**
+ * 모든 수영장의 리뷰를 삭제하는 관리자용 함수 (필요 시 호출)
+ */
+export const clearAllReviews = async (pools: Pool[]): Promise<Pool[]> => {
+    const updatedPools = pools.map(p => ({ ...p, reviews: [] }));
+    if (!supabase) {
+        localStorage.setItem('swimming_app_universal_pools', JSON.stringify(updatedPools));
+    } else {
+        for (const pool of updatedPools) {
+            await savePool(pool);
+        }
+    }
+    return updatedPools;
 };
 
 export const deletePool = async (poolId: string): Promise<boolean> => {

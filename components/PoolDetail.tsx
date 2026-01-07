@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, MapPin, Phone, Calendar, Star, Edit2, MessageSquare, Sparkles, Trash2, UserCheck, ExternalLink, Map as MapIcon, CheckCircle2, Waves, Thermometer, AlertCircle } from 'lucide-react';
+import { X, MapPin, Phone, Calendar, Star, Edit2, MessageSquare, Sparkles, Trash2, UserCheck, ExternalLink, Map as MapIcon, CheckCircle2, Waves, Thermometer, AlertCircle, User } from 'lucide-react';
 import { Pool, Review } from '../types';
 import { generatePoolSummary } from '../services/geminiService';
 
@@ -19,6 +19,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
   const [activeTab, setActiveTab] = useState<'info' | 'community' | 'ai'>('info');
   const [newReview, setNewReview] = useState("");
   const [newRating, setNewRating] = useState(5);
+  const [reviewerName, setReviewerName] = useState("");
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState(false);
 
@@ -28,7 +29,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
     const review: Review = {
       id: `rev-${Date.now()}`,
       userId: 'anonymous',
-      userName: '익명 수영인',
+      userName: reviewerName.trim() || '익명 수영인',
       rating: newRating,
       content: newReview,
       date: new Date().toISOString().split('T')[0]
@@ -37,6 +38,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
     const updated = { ...pool, reviews: [review, ...pool.reviews] };
     onUpdatePool(updated);
     setNewReview("");
+    setReviewerName("");
   };
 
   const fetchAiSummary = async () => {
@@ -227,17 +229,36 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
           {activeTab === 'community' && (
             <div className="space-y-6">
                 <div className="bg-blue-600/5 p-6 rounded-2xl border border-blue-600/10">
-                    <h3 className="font-bold text-blue-900 mb-4 text-sm">리뷰 작성 (익명)</h3>
+                    <h3 className="font-bold text-blue-900 mb-4 text-sm">리뷰 작성</h3>
+                    
+                    {/* 별점 선택 */}
                     <div className="flex gap-1.5 mb-4">
                         {[1, 2, 3, 4, 5].map((s) => (
                           <button key={s} onClick={() => setNewRating(s)}><Star className={`w-7 h-7 ${s <= newRating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-200'}`} /></button>
                         ))}
                     </div>
-                    <textarea 
-                      value={newReview} onChange={e => setNewReview(e.target.value)} 
-                      placeholder="이 수영장은 어떤가요? 자유수영 꿀팁을 공유해주세요!"
-                      className="w-full p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm min-h-[100px] bg-white transition-all"
-                    />
+
+                    <div className="space-y-3">
+                        {/* 작성자 이름 입력 */}
+                        <div className="relative">
+                            <input 
+                              type="text" 
+                              value={reviewerName} 
+                              onChange={e => setReviewerName(e.target.value)} 
+                              placeholder="작성자 이름 (익명 가능)"
+                              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm bg-white"
+                            />
+                            <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        </div>
+
+                        {/* 리뷰 내용 입력 */}
+                        <textarea 
+                          value={newReview} onChange={e => setNewReview(e.target.value)} 
+                          placeholder="이 수영장은 어떤가요? 자유수영 꿀팁을 공유해주세요!"
+                          className="w-full p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm min-h-[100px] bg-white transition-all"
+                        />
+                    </div>
+
                     <div className="flex justify-end mt-4">
                         <button onClick={handleAddReview} className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-md hover:bg-blue-700 transition-all active:scale-95">리뷰 등록</button>
                     </div>
@@ -253,7 +274,9 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                     <div key={r.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">익명</div>
+                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                              {r.userName.slice(0, 1)}
+                          </div>
                           <div>
                             <p className="text-sm font-bold text-slate-800">{r.userName}</p>
                             <div className="flex gap-0.5">
