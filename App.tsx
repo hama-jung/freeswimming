@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Waves, LocateFixed, CalendarCheck, PlusCircle, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, SlidersHorizontal, X, ChevronRight, Plus, Calendar } from 'lucide-react';
+import { Search, Waves, LocateFixed, CalendarCheck, PlusCircle, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, SlidersHorizontal, X, ChevronRight, Plus, Calendar, RotateCcw } from 'lucide-react';
 import { Pool, Region, DayType } from './types';
 import { MOCK_POOLS, REGIONS } from './constants';
 import PoolCard from './components/PoolCard';
@@ -18,41 +18,47 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-function isPoolAvailableOnDate(pool: Pool, targetDate: Date): boolean {
+/**
+ * 특정 날짜 및 시간에 수영장이 이용 가능한지 확인
+ */
+function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = false): boolean {
   const day = targetDate.getDay(); // 0: 일, 1: 월 ... 6: 토
   const currentMinutes = targetDate.getHours() * 60 + targetDate.getMinutes();
 
-  // 휴무일 체크 로직 (매우 간단한 문자열 포함 방식 우선 적용)
+  // 휴무일 체크
   const closed = pool.closedDays || "";
   if (closed.includes("매주 월요일") && day === 1) return false;
   if (closed.includes("매주 일요일") && day === 0) return false;
   
-  const isWeekend = (day === 0 || day === 6);
   const schedules = pool.freeSwimSchedule;
   
-  let possibleSchedules = schedules.filter(s => {
-    if (day === 0 && s.day === "일요일") return true;
-    if (day === 6 && s.day === "토요일") return true;
+  // 해당 요일에 해당하는 스케줄 필터링
+  const possibleSchedules = schedules.filter(s => {
+    if (day === 0 && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
+    if (day === 6 && (s.day === "토요일" || s.day === "주말/공휴일")) return true;
     if (day >= 1 && day <= 5 && s.day === "평일(월-금)") return true;
-    if (isWeekend && s.day === "주말/공휴일") return true;
+    if ((s.day as any) === "전체") return true;
     return false;
   });
 
-  // 시간을 고려하지 않는 날짜별 필터인 경우 (날짜만 선택한 경우) true 반환
-  // 현재 시간까지 고려하려면 true 체크
   if (possibleSchedules.length === 0) return false;
 
-  // 만약 "현재 이용가능" 필터가 켜진 상태라면 시간까지 체크
-  return possibleSchedules.some(s => {
-    const [startH, startM] = s.startTime.split(':').map(Number);
-    const [endH, endM] = s.endTime.split(':').map(Number);
-    const startMin = startH * 60 + startM;
-    const endMin = endH * 60 + endM;
-    return currentMinutes >= startMin && currentMinutes < endMin;
-  });
+  // 실시간 이용가능 체크 (오늘 날짜이면서 버튼이 켜진 경우)
+  if (checkRealtime) {
+    return possibleSchedules.some(s => {
+      const [endH, endM] = s.endTime.split(':').map(Number);
+      const endMin = endH * 60 + endM;
+      // 현재 시간 이전에 끝나는 타임은 제외 (현재 시간 이후에 종료되는 스케줄이 하나라도 있으면 true)
+      return currentMinutes < endMin;
+    });
+  }
+
+  // 단순 날짜 필터링인 경우 요일 스케줄만 있으면 true
+  return true;
 }
 
 function App() {
+  const todayStr = new Date().toISOString().split('T')[0];
   const [view, setView] = useState<'list' | 'form'>('list');
   const [displayMode, setDisplayMode] = useState<'map' | 'list'>('list');
   const [pools, setPools] = useState<Pool[]>([]);
@@ -66,9 +72,7 @@ function App() {
   const [selectedPoolDetail, setSelectedPoolDetail] = useState<Pool | null>(null);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
-  
-  // 날짜 필터 (기본값: 현재)
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   useEffect(() => {
     loadData();
@@ -104,21 +108,27 @@ function App() {
     );
   };
 
+  const resetDate = () => {
+    setSelectedDate(todayStr);
+    setShowAvailableOnly(false);
+  };
+
+  const isTodaySelected = selectedDate === todayStr;
+
   const processedPools = useMemo(() => {
     const targetDateObj = new Date(selectedDate);
-    // 만약 선택된 날짜가 오늘이라면 현재 시간 반영, 아니면 해당 날짜의 전체 가능 여부만 체크하도록 로직 확장 가능
-    // 여기서는 간단히 선택된 날짜의 "영업 여부"를 체크
     const now = new Date();
-    if (selectedDate === now.toISOString().split('T')[0]) {
+    
+    if (isTodaySelected) {
       targetDateObj.setHours(now.getHours(), now.getMinutes());
     } else {
-      targetDateObj.setHours(12, 0); // 특정 날짜 선택 시 낮 12시 기준으로 스케줄 존재 여부 체크
+      targetDateObj.setHours(0, 0); 
     }
 
     let list = pools.map(p => ({
       ...p,
       distance: userLocation ? calculateDistance(userLocation.lat, userLocation.lng, p.lat, p.lng) : undefined,
-      isAvailable: isPoolAvailableOnDate(p, targetDateObj)
+      isAvailable: isPoolAvailable(p, targetDateObj, isTodaySelected && showAvailableOnly)
     }));
 
     if (selectedRegion === "내주변" && userLocation) {
@@ -128,7 +138,11 @@ function App() {
       list = list.filter(p => p.region === selectedRegion);
     }
 
-    if (showAvailableOnly) {
+    // 1. 날짜(요일) 기반 필터링: 선택한 요일에 운영하지 않는 곳은 모두 제외
+    list = list.filter(p => isPoolAvailable(p, targetDateObj, false));
+
+    // 2. '이용가능만' (오늘 한정 현재 시간 이후 스케줄 존재 여부) 필터 적용
+    if (isTodaySelected && showAvailableOnly) {
       list = list.filter(p => p.isAvailable);
     }
 
@@ -138,7 +152,7 @@ function App() {
     }
 
     return list;
-  }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate]);
+  }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate, isTodaySelected]);
 
   if (view === 'form') {
     return <PoolFormPage initialData={editingPool} onSave={async (p) => {
@@ -182,14 +196,18 @@ function App() {
       </div>
 
       {/* Mobile Quick Action Buttons */}
-      <div className="sm:hidden flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100 z-30">
-        <button onClick={handleNearMe} className="flex-1 h-11 bg-white border-2 border-slate-100 rounded-xl font-black text-xs text-slate-700 flex items-center justify-center gap-1 active:scale-95 shadow-sm">
-          <LocateFixed size={16} className="text-brand-500" /> 내주변
-        </button>
-        <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} className={`flex-1 h-11 rounded-xl font-black text-xs flex items-center justify-center gap-1 transition-all active:scale-95 border-2 shadow-sm ${showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-100 text-slate-700'}`}>
+      <div className="sm:hidden flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100 z-30 overflow-x-auto no-scrollbar">
+        <button 
+          onClick={() => setShowAvailableOnly(!showAvailableOnly)} 
+          disabled={!isTodaySelected}
+          className={`flex-1 h-11 min-w-[100px] rounded-xl font-black text-xs flex items-center justify-center gap-1 transition-all border-2 shadow-sm ${!isTodaySelected ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-100 text-slate-700')}`}
+        >
           <CalendarCheck size={16} /> 이용가능만
         </button>
-        <button onClick={() => setIsFilterOpen(true)} className="w-11 h-11 bg-slate-50 text-slate-500 rounded-xl flex items-center justify-center border border-slate-200 active:scale-95 transition-all">
+        <button onClick={handleNearMe} className="flex-1 h-11 min-w-[80px] bg-white border-2 border-slate-100 rounded-xl font-black text-xs text-slate-700 flex items-center justify-center gap-1 active:scale-95 shadow-sm">
+          <LocateFixed size={16} className="text-brand-500" /> 내주변
+        </button>
+        <button onClick={() => setIsFilterOpen(true)} className="w-11 h-11 bg-slate-50 text-slate-500 rounded-xl flex items-center justify-center border border-slate-200 active:scale-90 transition-all shrink-0">
           <SlidersHorizontal size={18} />
         </button>
       </div>
@@ -241,25 +259,37 @@ function App() {
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
             </div>
             
-            {/* 날짜 선택 캘린더 필터 */}
-            <div className="relative group">
-               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-500 pointer-events-none">
+            <div className="relative flex items-center">
+               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-500 pointer-events-none z-10">
                   <Calendar size={20} />
                </div>
                <input 
                 type="date" 
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="h-16 pl-12 pr-6 bg-slate-100 border-2 border-transparent focus:border-brand-500 focus:bg-white rounded-2xl font-bold outline-none text-slate-700 cursor-pointer"
+                onChange={(e) => { setSelectedDate(e.target.value); if(e.target.value !== todayStr) setShowAvailableOnly(false); }}
+                className="h-16 pl-12 pr-12 bg-slate-100 border-2 border-transparent focus:border-brand-500 focus:bg-white rounded-2xl font-bold outline-none text-slate-700 cursor-pointer transition-all"
                />
+               {!isTodaySelected && (
+                 <button 
+                  onClick={resetDate}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 bg-white/50 rounded-full p-1 transition-all"
+                  title="오늘로 초기화"
+                 >
+                   <X size={16} strokeWidth={3} />
+                 </button>
+               )}
             </div>
+
+            <button 
+              onClick={() => setShowAvailableOnly(!showAvailableOnly)} 
+              disabled={!isTodaySelected}
+              className={`h-16 px-8 rounded-2xl font-black flex items-center gap-2 transition-all border-2 shadow-sm ${!isTodaySelected ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-500')}`}
+            >
+              <CalendarCheck size={20} /> {isTodaySelected ? '이용가능만' : '운영일만'}
+            </button>
 
             <button onClick={handleNearMe} className="h-16 px-8 bg-white border-2 border-slate-200 rounded-2xl font-black text-slate-700 flex items-center gap-2 hover:border-brand-500 hover:text-brand-600 transition-all shadow-sm">
               <LocateFixed size={20} className="text-brand-500" /> 내주변
-            </button>
-            
-            <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} className={`h-16 px-8 rounded-2xl font-black flex items-center gap-2 transition-all border-2 shadow-sm ${showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-slate-700 hover:border-emerald-500'}`}>
-              <CalendarCheck size={20} /> {selectedDate === new Date().toISOString().split('T')[0] ? '이용가능만' : '운영일만'}
             </button>
           </div>
 
@@ -283,7 +313,7 @@ function App() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in" onClick={() => setIsFilterOpen(false)}></div>
           <div className="relative w-[85%] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-black text-slate-900">검색 및 필터</h3>
+              <h3 className="text-xl font-black text-slate-900">상세 검색</h3>
               <button onClick={() => setIsFilterOpen(false)} className="p-2 text-slate-400"><X size={24} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -296,7 +326,12 @@ function App() {
               </div>
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">날짜 선택</label>
-                <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-14 px-4 bg-slate-50 rounded-2xl text-base font-bold outline-none border-2 border-transparent focus:border-brand-500" />
+                <div className="flex gap-2">
+                  <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="flex-1 h-14 px-4 bg-slate-50 rounded-2xl text-base font-bold outline-none border-2 border-transparent focus:border-brand-500" />
+                  {!isTodaySelected && (
+                    <button onClick={resetDate} className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-500 active:scale-90"><RotateCcw size={20} /></button>
+                  )}
+                </div>
               </div>
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">지역 선택</label>
@@ -329,8 +364,8 @@ function App() {
             {processedPools.length === 0 && (
               <div className="py-24 sm:py-32 text-center flex flex-col items-center justify-center">
                 <Info size={48} className="text-slate-200 mb-4" />
-                <h3 className="text-xl font-black text-slate-400 mb-1">검색 결과가 없습니다</h3>
-                <p className="text-sm text-slate-400 font-bold">필터나 검색어를 다시 확인해 보세요.</p>
+                <h3 className="text-xl font-black text-slate-400 mb-1">조건에 맞는 수영장이 없습니다</h3>
+                <p className="text-sm text-slate-400 font-bold">요일별 운영 정보를 다시 확인해 보세요.</p>
               </div>
             )}
             <div className="h-20 sm:hidden"></div>
