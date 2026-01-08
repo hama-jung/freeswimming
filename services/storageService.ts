@@ -112,7 +112,6 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
 
     if (error) {
       console.error("[Storage] DB Upsert Error:", error);
-      // 특정 에러 코드(PGRST204: 컬럼 없음)에 대한 친절한 설명 추가
       if (error.code === 'PGRST204') {
         return { 
           success: false, 
@@ -123,11 +122,15 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       return { success: false, code: error.code, error: error.message };
     }
 
-    // 히스토리 저장
-    supabase.from('pool_history').insert({
-      pool_id: pool.id,
-      snapshot_data: pool
-    }).catch(() => {});
+    // 히스토리 저장 (에러 핸들링 방식 수정: .catch() 대신 try-catch 블록 내 await 사용)
+    try {
+      await supabase.from('pool_history').insert({
+        pool_id: pool.id,
+        snapshot_data: pool
+      });
+    } catch (hErr) {
+      console.warn("[Storage] History backup skipped:", hErr);
+    }
 
     return { success: true };
   } catch (e: any) {
