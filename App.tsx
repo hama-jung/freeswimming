@@ -21,11 +21,9 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = false): boolean {
   const day = targetDate.getDay();
   const currentMinutes = targetDate.getHours() * 60 + targetDate.getMinutes();
-
   const closed = pool.closedDays || "";
   if (closed.includes("매주 월요일") && day === 1) return false;
   if (closed.includes("매주 일요일") && day === 0) return false;
-  
   const schedules = pool.freeSwimSchedule || [];
   const possibleSchedules = schedules.filter(s => {
     if (day === 0 && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
@@ -33,9 +31,7 @@ function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = 
     if (day >= 1 && day <= 5 && s.day === "평일(월-금)") return true;
     return false;
   });
-
   if (possibleSchedules.length === 0) return false;
-  
   if (checkRealtime) {
     return possibleSchedules.some(s => {
       const [endH, endM] = s.endTime.split(':').map(Number);
@@ -55,7 +51,6 @@ function App() {
   const [editingPool, setEditingPool] = useState<Pool | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  
   const [selectedRegion, setSelectedRegion] = useState<Region | "내주변">("전체");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPoolDetail, setSelectedPoolDetail] = useState<Pool | null>(null);
@@ -77,7 +72,6 @@ function App() {
         setPools(MOCK_POOLS);
       }
     } catch (e) {
-      console.error("Data load failed:", e);
       setPools(MOCK_POOLS);
     } finally {
       setIsLoading(false);
@@ -86,16 +80,31 @@ function App() {
 
   const showToast = (text: string, type: 'success'|'error' = 'success') => {
     setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 4000);
+    setTimeout(() => setToastMessage(null), 5000);
+  };
+
+  const handleUpdatePoolData = async (updatedPool: Pool) => {
+    setIsLoading(true);
+    try {
+      const success = await savePool(updatedPool);
+      if (success) {
+        const freshList = await getStoredPools();
+        setPools(freshList);
+        const freshMatch = freshList.find(p => p.id === updatedPool.id);
+        if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
+        showToast("수영장 정보가 성공적으로 반영되었습니다.", 'success');
+      } else {
+        showToast("데이터베이스 저장에 실패했습니다. Supabase RLS 정책 또는 Vercel 환경 변수를 확인하세요.", 'error');
+      }
+    } catch (e) {
+      showToast("데이터 처리 중 예기치 못한 오류가 발생했습니다.", 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleNearMe = () => {
-    if (selectedRegion === "내주변") {
-      setSelectedRegion("전체");
-      setUserLocation(null);
-      return;
-    }
-
+    if (selectedRegion === "내주변") { setSelectedRegion("전체"); setUserLocation(null); return; }
     if (!navigator.geolocation) return alert("위치 정보를 지원하지 않는 브라우저입니다.");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -108,13 +117,8 @@ function App() {
   };
 
   const handleLogoClick = () => {
-    setView('list');
-    setDisplayMode('list');
-    setSelectedRegion('전체');
-    setSearchQuery('');
-    setShowAvailableOnly(false);
-    setSelectedDate(todayStr);
-    setSelectedPoolDetail(null);
+    setView('list'); setDisplayMode('list'); setSelectedRegion('전체'); setSearchQuery('');
+    setShowAvailableOnly(false); setSelectedDate(todayStr); setSelectedPoolDetail(null);
   };
 
   const isTodaySelected = selectedDate === todayStr;
@@ -122,12 +126,8 @@ function App() {
   const processedPools = useMemo(() => {
     const targetDateObj = new Date(selectedDate);
     const now = new Date();
-    
-    if (isTodaySelected) {
-      targetDateObj.setHours(now.getHours(), now.getMinutes());
-    } else {
-      targetDateObj.setHours(0, 0); 
-    }
+    if (isTodaySelected) targetDateObj.setHours(now.getHours(), now.getMinutes());
+    else targetDateObj.setHours(0, 0); 
 
     let list = pools.map(p => ({
       ...p,
@@ -135,11 +135,8 @@ function App() {
       isAvailable: isPoolAvailable(p, targetDateObj, isTodaySelected)
     }));
 
-    if (view === 'private') {
-      list = list.filter(p => p.isPublic === false);
-    } else {
-      list = list.filter(p => p.isPublic !== false);
-    }
+    if (view === 'private') list = list.filter(p => p.isPublic === false);
+    else list = list.filter(p => p.isPublic !== false);
 
     if (view !== 'private') {
       if (selectedRegion === "내주변" && userLocation) {
@@ -148,55 +145,25 @@ function App() {
       } else if (selectedRegion !== "전체" && selectedRegion !== "내주변") {
         list = list.filter(p => p.region === selectedRegion);
       }
-
-      if (showAvailableOnly) {
-        list = list.filter(p => p.isAvailable);
-      }
+      if (showAvailableOnly) list = list.filter(p => p.isAvailable);
     }
-
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
     }
-
     return list;
   }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate, isTodaySelected, view]);
-
-  const handleUpdatePoolData = async (updatedPool: Pool) => {
-    setIsLoading(true);
-    try {
-      const success = await savePool(updatedPool);
-      const freshList = await getStoredPools();
-      setPools(freshList);
-      
-      if (success) {
-        const freshMatch = freshList.find(p => p.id === updatedPool.id);
-        if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
-        showToast("수영장 정보가 데이터베이스에 안전하게 저장되었습니다.");
-      } else {
-        showToast("데이터베이스 저장에 실패했습니다. (환경 변수나 서버 권한을 확인하세요)", 'error');
-      }
-    } catch (e) {
-      console.error(e);
-      showToast("데이터 처리 중 예외가 발생했습니다.", 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   if (view === 'form') {
     return (
       <PoolFormPage 
         initialData={editingPool} 
         onSave={async (p) => {
-          setView('list');
           setEditingPool(undefined);
+          setView('list');
           await handleUpdatePoolData(p);
         }} 
-        onCancel={() => { 
-          setView('list'); 
-          setEditingPool(undefined); 
-        }} 
+        onCancel={() => { setView('list'); setEditingPool(undefined); }} 
       />
     );
   }
@@ -212,12 +179,9 @@ function App() {
 
       {toastMessage && (
         <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 transition-all ${toastMessage.type === 'success' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white'}`}>
-          {toastMessage.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 text-emerald-400" />
-          ) : (
-            <AlertTriangle className="w-5 h-5 text-yellow-300" />
-          )}
+          {toastMessage.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <AlertTriangle className="w-5 h-5 text-yellow-300" />}
           <span className="text-sm font-black">{toastMessage.text}</span>
+          <button onClick={() => setToastMessage(null)} className="ml-2 text-white/50 hover:text-white"><X size={16} /></button>
         </div>
       )}
 
@@ -232,92 +196,46 @@ function App() {
             <div className="space-y-3">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">보기 모드</h3>
               <div className="flex bg-slate-100 p-1.5 rounded-2xl">
-                <button 
-                  onClick={() => setDisplayMode('map')} 
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${displayMode === 'map' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500'}`}
-                >
-                  <MapIcon size={18} /> 지도
-                </button>
-                <button 
-                  onClick={() => setDisplayMode('list')} 
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${displayMode === 'list' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500'}`}
-                >
-                  <ListIcon size={18} /> 목록
-                </button>
+                <button onClick={() => setDisplayMode('map')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${displayMode === 'map' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500'}`}><MapIcon size={18} /> 지도</button>
+                <button onClick={() => setDisplayMode('list')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${displayMode === 'list' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500'}`}><ListIcon size={18} /> 목록</button>
               </div>
             </div>
-
             <div className="space-y-3">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">수영장 검색</h3>
               <div className="relative">
-                <input 
-                  type="text" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="수영장 이름 또는 동네"
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
-                />
+                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="수영장 이름 또는 동네" className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
               </div>
             </div>
-
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">날짜 선택</h3>
-                {!isTodaySelected && (
-                  <button onClick={() => setSelectedDate(todayStr)} className="text-xs font-black text-brand-600 flex items-center gap-1">
-                    <X size={12} strokeWidth={3} /> 오늘로 초기화
-                  </button>
-                )}
+                {!isTodaySelected && <button onClick={() => setSelectedDate(todayStr)} className="text-xs font-black text-brand-600 flex items-center gap-1"><X size={12} strokeWidth={3} /> 오늘로 초기화</button>}
               </div>
               <div className="relative">
-                <input 
-                  type="date" 
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none"
-                />
+                <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
                 <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
               </div>
             </div>
-
             <div className="space-y-3">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">지역 선택</h3>
               <div className="grid grid-cols-3 gap-2">
                 {REGIONS.map(reg => (
-                  <button
-                    key={reg}
-                    onClick={() => setSelectedRegion(selectedRegion === reg ? "전체" : reg)}
-                    className={`py-3 rounded-xl font-black text-xs border-2 transition-all ${selectedRegion === reg ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}
-                  >
-                    {reg}
-                  </button>
+                  <button key={reg} onClick={() => setSelectedRegion(selectedRegion === reg ? "전체" : reg)} className={`py-3 rounded-xl font-black text-xs border-2 transition-all ${selectedRegion === reg ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}>{reg}</button>
                 ))}
               </div>
             </div>
           </div>
-          <div className="p-6 border-t border-slate-100">
-            <button onClick={() => setIsFilterOpen(false)} className="w-full bg-brand-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">설정 적용하기</button>
-          </div>
+          <div className="p-6 border-t border-slate-100"><button onClick={() => setIsFilterOpen(false)} className="w-full bg-brand-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">설정 적용하기</button></div>
         </div>
       )}
 
-      {/* 헤더 섹션 */}
       <header className="bg-white border-b border-slate-100 z-50 sticky top-0 shrink-0">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-          <button 
-            className="flex items-center gap-3 group text-left cursor-pointer focus:outline-none" 
-            onClick={handleLogoClick}
-          >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-lg shadow-brand-100 group-active:scale-95 transition-all">
-              <Waves size={24} className="sm:hidden" strokeWidth={3} />
-              <Waves size={30} className="hidden sm:block" strokeWidth={3} />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 leading-tight">자유수영.kr</h1>
-            </div>
+          <button className="flex items-center gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-lg"><Waves size={24} strokeWidth={3} /></div>
+            <h1 className="text-lg sm:text-2xl font-black text-slate-900">자유수영.kr</h1>
           </button>
-
           <div className="flex items-center gap-2">
             {view === 'list' && (
               <div className="hidden sm:flex bg-slate-100 p-1.5 rounded-2xl mr-4">
@@ -325,115 +243,39 @@ function App() {
                 <button onClick={() => setDisplayMode('list')} className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-black transition-all ${displayMode === 'list' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}><ListIcon size={18} /> 목록</button>
               </div>
             )}
-            <button onClick={() => setView('form')} className="bg-brand-600 text-white px-4 sm:px-6 h-10 sm:h-12 rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm shadow-md active:scale-95 flex items-center gap-2 hover:bg-brand-700 transition-all">
-              <Plus size={18} strokeWidth={3} /> <span className="hidden sm:inline">수영장 등록</span><span className="sm:hidden">기록</span>
+            <button onClick={() => setView('form')} className="bg-brand-600 text-white px-4 sm:px-6 h-10 sm:h-12 rounded-xl font-black text-xs sm:text-sm shadow-md active:scale-95 flex items-center gap-2 transition-all">
+              <Plus size={18} strokeWidth={3} /> <span className="hidden sm:inline">수영장 등록</span><span className="sm:hidden">등록</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* 상단 필터 바 */}
       {view === 'list' && (
         <div className="bg-white border-b border-slate-100 z-40 sticky top-16 sm:top-20 shrink-0">
           <div className="max-w-[1280px] mx-auto">
-            {/* PC 전용 상세 필터 바 */}
             <div className="hidden sm:flex px-6 py-4 gap-4 items-center border-b border-slate-50">
               <div className="relative flex-1 max-w-md">
-                <input 
-                  type="text" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="어느 수영장을 찾으세요?"
-                  className="w-full pl-12 pr-4 h-14 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all outline-none"
-                />
+                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="어느 수영장을 찾으세요?" className="w-full pl-12 pr-4 h-14 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all outline-none" />
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
               </div>
               <div className="flex gap-2 shrink-0">
                 <div className="relative w-56 group">
-                  <input 
-                    type="date" 
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full h-14 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none cursor-pointer focus:border-brand-500 focus:bg-white transition-all"
-                  />
-                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 pointer-events-none" />
-                  {!isTodaySelected && (
-                    <button 
-                      onClick={() => setSelectedDate(todayStr)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-slate-200 hover:bg-slate-300 rounded-full transition-all active:scale-90"
-                      title="오늘로 날짜 초기화"
-                    >
-                      <X size={16} strokeWidth={3} className="text-slate-600" />
-                    </button>
-                  )}
+                  <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-14 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none" />
+                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  {!isTodaySelected && <button onClick={() => setSelectedDate(todayStr)} className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-slate-200 rounded-full transition-all active:scale-90"><X size={16} strokeWidth={3} /></button>}
                 </div>
-                <button 
-                  onClick={handleNearMe}
-                  className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'}`}
-                >
-                  <LocateFixed size={18} /> 내주변
-                </button>
-                <button 
-                  onClick={() => setShowAvailableOnly(!showAvailableOnly)} 
-                  disabled={!isTodaySelected}
-                  className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${!isTodaySelected ? 'bg-slate-50 text-slate-300 border-slate-100' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300')}`}
-                >
-                  <CalendarCheck size={18} /> 오늘가능
-                </button>
+                <button onClick={handleNearMe} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'}`}><LocateFixed size={18} /> 내주변</button>
+                <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${!isTodaySelected ? 'bg-slate-50 text-slate-300 border-slate-100' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300')}`}><CalendarCheck size={18} /> 오늘가능</button>
               </div>
             </div>
-
-            {/* 지역 탭 */}
             <div className="hidden sm:flex px-6 py-3 items-center gap-2 overflow-x-auto no-scrollbar">
-              {REGIONS.map(reg => (
-                <button
-                  key={reg}
-                  onClick={() => setSelectedRegion(selectedRegion === reg ? "전체" : reg)}
-                  className={`shrink-0 h-9 px-5 rounded-full font-black text-xs transition-all border-2 ${selectedRegion === reg ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'}`}
-                >
-                  {reg}
-                </button>
-              ))}
+              {REGIONS.map(reg => <button key={reg} onClick={() => setSelectedRegion(selectedRegion === reg ? "전체" : reg)} className={`shrink-0 h-9 px-5 rounded-full font-black text-xs transition-all border-2 ${selectedRegion === reg ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'}`}>{reg}</button>)}
             </div>
-
-            {/* 모바일 전용 퀵 필터 바 */}
             <div className="sm:hidden px-4 py-3 flex gap-2">
-              <button 
-                onClick={handleNearMe}
-                className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 border-2 transition-all ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-700'}`}
-              >
-                <LocateFixed size={18} /> 내주변
-              </button>
-              <button 
-                onClick={() => setShowAvailableOnly(!showAvailableOnly)}
-                disabled={!isTodaySelected}
-                className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 border-2 transition-all ${!isTodaySelected ? 'bg-slate-50 text-slate-200' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-700')}`}
-              >
-                <CalendarCheck size={18} /> 오늘가능
-              </button>
-              <button 
-                onClick={() => setIsFilterOpen(true)}
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all ${isTodaySelected && showAvailableOnly || selectedRegion !== '전체' ? 'bg-brand-600 text-white' : 'bg-slate-900 text-white'}`}
-              >
-                <Filter size={20} />
-              </button>
+              <button onClick={handleNearMe} className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 border-2 transition-all ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-700'}`}><LocateFixed size={18} /> 내주변</button>
+              <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 border-2 transition-all ${!isTodaySelected ? 'bg-slate-50 text-slate-200' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-700')}`}><CalendarCheck size={18} /> 오늘가능</button>
+              <button onClick={() => setIsFilterOpen(true)} className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg active:scale-90 transition-all ${isTodaySelected && showAvailableOnly || selectedRegion !== '전체' ? 'bg-brand-600 text-white' : 'bg-slate-900 text-white'}`}><Filter size={20} /></button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* 비공개 목록 뷰 헤더 */}
-      {view === 'private' && (
-        <div className="bg-slate-900 text-white py-12 px-6">
-          <div className="max-w-4xl mx-auto space-y-4">
-            <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors font-bold">
-              <ArrowLeft size={20} /> 돌아가기
-            </button>
-            <div className="flex items-end gap-3">
-              <EyeOff size={40} className="text-red-500 mb-1" />
-              <h2 className="text-4xl font-black tracking-tight">비공개 수영장 목록</h2>
-            </div>
-            <p className="text-slate-400 font-bold">현재 비공개 상태인 수영장들입니다. 상세 페이지에서 노출 설정을 다시 변경할 수 있습니다.</p>
           </div>
         </div>
       )}
@@ -446,20 +288,13 @@ function App() {
         ) : (
           <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 py-8 sm:py-16">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
-              {processedPools.map(p => (
-                <PoolCard key={p.id} pool={p} onClick={setSelectedPoolDetail} distance={p.distance} />
-              ))}
+              {processedPools.map(p => <PoolCard key={p.id} pool={p} onClick={setSelectedPoolDetail} distance={p.distance} />)}
             </div>
             {processedPools.length === 0 && (
               <div className="py-24 sm:py-32 text-center flex flex-col items-center justify-center bg-white rounded-[40px] border-2 border-dashed border-slate-100">
-                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                  <Info size={40} className="text-slate-300" />
-                </div>
+                <Info size={40} className="text-slate-300 mb-6" />
                 <h3 className="text-xl font-black text-slate-800 mb-2">검색 결과가 없습니다</h3>
-                <p className="text-sm text-slate-400 font-bold max-w-[280px] leading-relaxed">수영장 이름을 확인하거나 필터 설정을 변경해 보세요.</p>
-                {view === 'list' && (
-                  <button onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setShowAvailableOnly(false); setSelectedDate(todayStr); }} className="mt-6 text-brand-600 font-black text-sm underline">필터 초기화</button>
-                )}
+                <p className="text-sm text-slate-400 font-bold">필터 설정을 변경해 보세요.</p>
               </div>
             )}
             <div className="h-24 sm:hidden"></div>
@@ -467,29 +302,12 @@ function App() {
         )}
       </main>
 
-      {/* 푸터 섹션 */}
       {view !== 'form' && (
-        <footer className="bg-white border-t border-slate-100 py-12 px-6 shrink-0 mt-auto">
+        <footer className="bg-white border-t border-slate-100 py-12 px-6 mt-auto">
           <div className="max-w-[1280px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex flex-col items-center sm:items-start gap-1">
-              <div className="flex items-center gap-2 text-slate-800 font-black text-lg">
-                <Waves className="w-5 h-5 text-brand-600" />
-                자유수영.kr
-              </div>
-              <p className="text-sm text-slate-400 font-bold text-center sm:text-left">
-                자유수영 정보를 누구나 추가하고 수정할 수 있습니다. 
-                <span className="inline-block sm:ml-2 text-brand-500">
-                  <Heart className="inline-block w-3 h-3 fill-current mb-0.5" /> 수영인들을 위해 기여해 주세요!
-                </span>
-              </p>
-            </div>
+            <div className="flex items-center gap-2 text-slate-800 font-black text-lg"><Waves className="w-5 h-5 text-brand-600" /> 자유수영.kr</div>
             <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setView('private')} 
-                className={`text-xs font-black px-4 py-2 rounded-xl transition-all ${view === 'private' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600 border border-slate-200'}`}
-              >
-                비공개 수영장 보기
-              </button>
+              <button onClick={() => setView('private')} className={`text-xs font-black px-4 py-2 rounded-xl transition-all ${view === 'private' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600 border border-slate-200'}`}>비공개 수영장 보기</button>
               <span className="text-xs text-slate-300 font-bold">© 2024 Freeswim KR</span>
             </div>
           </div>
