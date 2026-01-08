@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart } from 'lucide-react';
+import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle } from 'lucide-react';
 import { Pool, Region } from './types';
 import { MOCK_POOLS, REGIONS } from './constants';
 import PoolCard from './components/PoolCard';
@@ -23,7 +23,6 @@ function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = 
   const currentMinutes = targetDate.getHours() * 60 + targetDate.getMinutes();
 
   const closed = pool.closedDays || "";
-  // 간단한 요일 체크 (추후 정교한 holidayOptions 체크로 확장 가능)
   if (closed.includes("매주 월요일") && day === 1) return false;
   if (closed.includes("매주 일요일") && day === 0) return false;
   
@@ -32,7 +31,6 @@ function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = 
     if (day === 0 && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
     if (day === 6 && (s.day === "토요일" || s.day === "주말/공휴일")) return true;
     if (day >= 1 && day <= 5 && s.day === "평일(월-금)") return true;
-    if (s.day === "공휴일") return false; // 기본적으로 평일/주말 위주 체크
     return false;
   });
 
@@ -55,7 +53,7 @@ function App() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingPool, setEditingPool] = useState<Pool | undefined>(undefined);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   
   const [selectedRegion, setSelectedRegion] = useState<Region | "내주변">("전체");
@@ -76,9 +74,7 @@ function App() {
       if (stored && stored.length > 0) {
         setPools(stored);
       } else {
-        // 데이터가 아예 없는 경우에만 MOCK 데이터 초기화
         setPools(MOCK_POOLS);
-        for (const p of MOCK_POOLS) await savePool(p);
       }
     } catch (e) {
       console.error("Data load failed:", e);
@@ -88,9 +84,9 @@ function App() {
     }
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  const showToast = (text: string, type: 'success'|'error' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   const handleNearMe = () => {
@@ -139,7 +135,6 @@ function App() {
       isAvailable: isPoolAvailable(p, targetDateObj, isTodaySelected)
     }));
 
-    // 공개/비공개 필터
     if (view === 'private') {
       list = list.filter(p => p.isPublic === false);
     } else {
@@ -147,7 +142,6 @@ function App() {
     }
 
     if (view !== 'private') {
-      // 지역 필터
       if (selectedRegion === "내주변" && userLocation) {
         list = list.filter(p => p.distance !== undefined && p.distance <= 5);
         list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
@@ -155,13 +149,11 @@ function App() {
         list = list.filter(p => p.region === selectedRegion);
       }
 
-      // [중요!] 오늘가능 필터가 켜져 있을 때만 가용성 체크
       if (showAvailableOnly) {
         list = list.filter(p => p.isAvailable);
       }
     }
 
-    // 검색어 필터
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
@@ -174,18 +166,19 @@ function App() {
     setIsLoading(true);
     try {
       const success = await savePool(updatedPool);
+      const freshList = await getStoredPools();
+      setPools(freshList);
+      
       if (success) {
-        const freshList = await getStoredPools();
-        setPools(freshList);
         const freshMatch = freshList.find(p => p.id === updatedPool.id);
         if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
-        showToast("정보가 성공적으로 반영되었습니다.");
+        showToast("수영장 정보가 데이터베이스에 안전하게 저장되었습니다.");
       } else {
-        alert("정보 저장에 실패했습니다. 네트워크 상태를 확인해 주세요.");
+        showToast("데이터베이스 저장에 실패했습니다. (환경 변수나 서버 권한을 확인하세요)", 'error');
       }
     } catch (e) {
       console.error(e);
-      alert("데이터 처리 중 오류가 발생했습니다.");
+      showToast("데이터 처리 중 예외가 발생했습니다.", 'error');
     } finally {
       setIsLoading(false);
     }
@@ -213,14 +206,18 @@ function App() {
       {isLoading && (
         <div className="fixed inset-0 z-[100] bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center">
           <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
-          <p className="font-bold text-slate-600">수영장 정보를 동기화하고 있습니다...</p>
+          <p className="font-bold text-slate-600">데이터를 동기화하고 있습니다...</p>
         </div>
       )}
 
       {toastMessage && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-slate-900 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-2 animate-in slide-in-from-bottom-4">
-          <CheckCircle className="w-4 h-4 text-emerald-400" />
-          <span className="text-sm font-bold">{toastMessage}</span>
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 transition-all ${toastMessage.type === 'success' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white'}`}>
+          {toastMessage.type === 'success' ? (
+            <CheckCircle className="w-5 h-5 text-emerald-400" />
+          ) : (
+            <AlertTriangle className="w-5 h-5 text-yellow-300" />
+          )}
+          <span className="text-sm font-black">{toastMessage.text}</span>
         </div>
       )}
 
@@ -508,10 +505,11 @@ function App() {
           onDeleteRequest={async (id) => { 
             if(confirm('이 수영장 정보를 삭제할까요?')) {
               setIsLoading(true);
-              await deletePool(id); 
+              const success = await deletePool(id); 
               await loadData(); 
               setSelectedPoolDetail(null); 
-              showToast('정보가 삭제되었습니다.');
+              if (success) showToast('정보가 삭제되었습니다.');
+              else showToast('데이터베이스 삭제 실패 (권한 확인 필요)', 'error');
               setIsLoading(false);
             }
           }}
