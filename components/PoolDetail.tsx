@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
-import { X, MapPin, Phone, Calendar, Star, Edit2, MessageSquare, Sparkles, Trash2, UserCheck, ExternalLink, Map as MapIcon, CheckCircle2, Waves, Thermometer, AlertCircle, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, MapPin, Phone, Calendar, Star, Edit2, MessageSquare, Sparkles, CheckCircle2, Waves, Thermometer, AlertCircle, User, History, Settings } from 'lucide-react';
 import { Pool, Review } from '../types';
 import { generatePoolSummary } from '../services/geminiService';
+import VersionHistory from './VersionHistory';
 
 interface PoolDetailProps {
   pool: Pool;
@@ -10,18 +11,25 @@ interface PoolDetailProps {
   onUpdatePool: (updatedPool: Pool) => void;
   onEditRequest: (pool: Pool) => void;
   onDeleteRequest: (poolId: string) => void;
-  isUserCreated: boolean;
   user: any; 
   onLoginRequest: () => void;
 }
 
-const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, onEditRequest, onDeleteRequest, isUserCreated }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'community' | 'ai'>('info');
+const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, onEditRequest }) => {
+  const [activeTab, setActiveTab] = useState<'info' | 'community' | 'ai' | 'history'>('info');
   const [newReview, setNewReview] = useState("");
   const [newRating, setNewRating] = useState(5);
   const [reviewerName, setReviewerName] = useState("");
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState(false);
+
+  // pool 객체의 어떤 필드가 바뀌어도 UI를 갱신하도록 JSON.stringify 사용
+  useEffect(() => {
+    setAiSummary("");
+    // 수정이나 복구 후 사용자가 바뀐 결과를 바로 볼 수 있도록 '정보' 탭으로 전환
+    setActiveTab('info');
+    console.log("[PoolDetail] Data refreshed for:", pool.name);
+  }, [pool.id, JSON.stringify(pool)]);
 
   const handleAddReview = () => {
     if (!newReview.trim()) return;
@@ -58,8 +66,6 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                    pool.closedDays === 'EVERY_SUN' ? '매주 일요일' : 
                    pool.closedDays === 'SUN_2_4' ? '2, 4주 일요일' : pool.closedDays;
 
-  const { holidayOptions } = pool;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col relative animate-in slide-in-from-bottom-4 duration-300">
@@ -70,14 +76,6 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
           <button onClick={onClose} className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 text-white p-2 rounded-full transition-colors"><X className="w-6 h-6" /></button>
           
-          <div className="absolute top-4 left-4 flex gap-2">
-            {isUserCreated && (
-              <div className="bg-indigo-600/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 border border-white/20">
-                <UserCheck className="w-3.5 h-3.5" /> 내가 등록한 정보
-              </div>
-            )}
-          </div>
-
           <div className="absolute bottom-6 left-6 right-6 text-white">
             <h2 className="text-3xl font-bold mb-2 tracking-tight">{pool.name}</h2>
             <div className="flex items-center gap-2 text-sm text-white/90">
@@ -88,18 +86,26 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-100 bg-white shrink-0 px-2">
-          {['info', 'community', 'ai'].map((tab) => (
+        <div className="flex border-b border-slate-100 bg-white shrink-0 px-2 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'info', label: '정보 및 요금' },
+            { id: 'community', label: `리뷰 (${pool.reviews.length})` },
+            { id: 'ai', label: 'AI 분석' },
+            { id: 'history', label: '변경 이력' }
+          ].map((tab) => (
             <button 
-              key={tab}
+              key={tab.id}
               onClick={() => { 
-                setActiveTab(tab as any);
-                if (tab === 'ai' && !aiSummary) fetchAiSummary();
+                setActiveTab(tab.id as any);
+                if (tab.id === 'ai' && !aiSummary) fetchAiSummary();
               }}
-              className={`flex-1 py-4 font-bold text-sm transition-all relative ${activeTab === tab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`flex-1 min-w-[100px] py-4 font-bold text-sm transition-all relative ${activeTab === tab.id ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
             >
-              {tab === 'info' ? '정보 및 요금' : tab === 'community' ? `리뷰 (${pool.reviews.length})` : 'AI 분석'}
-              {activeTab === tab && <div className="absolute bottom-0 left-1/4 right-1/4 h-1 bg-blue-600 rounded-full"></div>}
+              <div className="flex items-center justify-center gap-1.5">
+                {tab.id === 'history' && <History className="w-3.5 h-3.5" />}
+                {tab.label}
+              </div>
+              {activeTab === tab.id && <div className="absolute bottom-0 left-1/4 right-1/4 h-1 bg-blue-600 rounded-full"></div>}
             </button>
           ))}
         </div>
@@ -120,34 +126,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                       >
                         <Edit2 className="w-4 h-4" /> 수정
                       </button>
-                      {isUserCreated && (
-                        <button 
-                          onClick={() => onDeleteRequest(pool.id)}
-                          className="bg-red-50 border border-red-100 text-red-500 hover:bg-red-100 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                        >
-                          <Trash2 className="w-4 h-4" /> 삭제
-                        </button>
-                      )}
                     </div>
-                </div>
-
-                {/* 특수 시설 태그 */}
-                <div className="flex flex-wrap gap-2">
-                    {pool.hasHeatedPool && (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold border border-orange-200">
-                            <Thermometer className="w-3 h-3" /> 온수풀
-                        </span>
-                    )}
-                    {pool.hasWalkingLane && (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-bold border border-blue-200">
-                            <Waves className="w-3 h-3" /> 걷기 레인
-                        </span>
-                    )}
-                    {pool.hasKidsPool && (
-                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-bold border border-green-200">
-                            <CheckCircle2 className="w-3 h-3" /> 유아풀
-                        </span>
-                    )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -155,7 +134,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
                         시설 정보
                         <button onClick={openInGoogleMaps} className="text-[10px] text-blue-600 flex items-center gap-1 hover:underline">
-                            <MapIcon className="w-3 h-3" /> 지도 앱에서 보기
+                            <Settings className="w-3 h-3" /> 지도 앱에서 보기
                         </button>
                     </h4>
                     <div className="flex justify-between text-sm">
@@ -171,22 +150,6 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                   <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">정기 휴무일</h4>
                     <p className="text-sm font-bold text-red-500">{holidayLabel}</p>
-                    
-                    {/* 공휴일/임시공휴일 배지 추가 */}
-                    {(holidayOptions?.publicHolidayEnabled || holidayOptions?.temporaryHolidayEnabled) && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {holidayOptions.publicHolidayEnabled && (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-red-50 text-red-600 rounded-md font-bold border border-red-100">
-                            <AlertCircle className="w-2.5 h-2.5" /> 공휴일 휴무
-                          </span>
-                        )}
-                        {holidayOptions.temporaryHolidayEnabled && (
-                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 bg-red-50 text-red-600 rounded-md font-bold border border-red-100">
-                            <AlertCircle className="w-2.5 h-2.5" /> 임시공휴일 휴무
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -216,13 +179,6 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                     )) : <p className="text-sm text-slate-400 text-center">등록된 요금이 없습니다.</p>}
                   </div>
                 </div>
-
-                {pool.extraFeatures && (
-                    <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100/50">
-                        <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">참고 사항</h4>
-                        <p className="text-sm text-blue-700 leading-relaxed whitespace-pre-line">{pool.extraFeatures}</p>
-                    </div>
-                )}
             </div>
           )}
 
@@ -230,47 +186,32 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
             <div className="space-y-6">
                 <div className="bg-blue-600/5 p-6 rounded-2xl border border-blue-600/10">
                     <h3 className="font-bold text-blue-900 mb-4 text-sm">리뷰 작성</h3>
-                    
-                    {/* 별점 선택 */}
                     <div className="flex gap-1.5 mb-4">
                         {[1, 2, 3, 4, 5].map((s) => (
                           <button key={s} onClick={() => setNewRating(s)}><Star className={`w-7 h-7 ${s <= newRating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-200'}`} /></button>
                         ))}
                     </div>
-
                     <div className="space-y-3">
-                        {/* 작성자 이름 입력 */}
-                        <div className="relative">
-                            <input 
-                              type="text" 
-                              value={reviewerName} 
-                              onChange={e => setReviewerName(e.target.value)} 
-                              placeholder="작성자 이름 (익명 가능)"
-                              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm bg-white"
-                            />
-                            <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                        </div>
-
-                        {/* 리뷰 내용 입력 */}
+                        <input 
+                          type="text" 
+                          value={reviewerName} 
+                          onChange={e => setReviewerName(e.target.value)} 
+                          placeholder="작성자 이름"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm bg-white"
+                        />
                         <textarea 
                           value={newReview} onChange={e => setNewReview(e.target.value)} 
-                          placeholder="이 수영장은 어떤가요? 자유수영 꿀팁을 공유해주세요!"
+                          placeholder="자유수영 꿀팁을 공유해주세요!"
                           className="w-full p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm min-h-[100px] bg-white transition-all"
                         />
                     </div>
-
                     <div className="flex justify-end mt-4">
                         <button onClick={handleAddReview} className="bg-blue-600 text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-md hover:bg-blue-700 transition-all active:scale-95">리뷰 등록</button>
                     </div>
                 </div>
 
                 <div className="space-y-4">
-                  {pool.reviews.length === 0 ? (
-                    <div className="text-center py-16 text-slate-400">
-                        <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-10" />
-                        <p className="text-sm font-medium">첫 번째 리뷰를 남겨주세요!</p>
-                    </div>
-                  ) : pool.reviews.map(r => (
+                  {pool.reviews.map(r => (
                     <div key={r.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex items-center gap-2">
@@ -301,24 +242,32 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                         <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm"><Sparkles className="w-6 h-6" /></div>
                         <h3 className="text-xl font-bold">수영장 AI 리포트</h3>
                     </div>
-                    
                     {isLoadingAi ? (
                         <div className="space-y-4 animate-pulse relative z-10">
                             <div className="h-4 bg-white/20 rounded w-3/4"></div>
                             <div className="h-4 bg-white/20 rounded w-1/2"></div>
                             <div className="h-4 bg-white/20 rounded w-5/6"></div>
-                            <p className="text-xs text-white/60 mt-6 text-center">Gemini가 최신 정보를 바탕으로 분석 중입니다...</p>
                         </div>
                     ) : (
                         <div className="relative z-10">
                             <p className="text-white/90 whitespace-pre-line leading-relaxed text-sm font-medium">
-                                {aiSummary}
+                                {aiSummary || "정보를 분석하는 중입니다..."}
                             </p>
                         </div>
                     )}
                 </div>
-                <p className="mt-4 text-[11px] text-slate-400 text-center">* AI 분석은 등록된 텍스트 정보를 기반으로 하며 실제와 다를 수 있습니다.</p>
             </div>
+          )}
+
+          {activeTab === 'history' && (
+            <VersionHistory 
+              poolId={pool.id} 
+              currentData={pool}
+              onRestore={async (restoredData) => {
+                await onUpdatePool(restoredData);
+              }} 
+              onUpdatePool={onUpdatePool}
+            />
           )}
         </div>
       </div>

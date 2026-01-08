@@ -43,6 +43,9 @@
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
       }
+      .pool-marker-container {
+        pointer-events: auto !important;
+      }
       .pool-marker-bubble {
         border-radius: 99px;
         padding: 6px 14px;
@@ -57,11 +60,11 @@
         align-items: center;
         justify-content: center;
         min-width: 80px;
-        transition: transform 0.2s;
+        transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       }
       .pool-marker-bubble:hover {
         transform: scale(1.1);
-        z-index: 1000;
+        z-index: 5000;
       }
       .pool-marker-available { background: #2563eb; }
       .pool-marker-unavailable { background: #64748b; }
@@ -72,10 +75,16 @@
         box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.3);
         width: 18px !important;
         height: 18px !important;
+        pointer-events: none;
       }
       .leaflet-div-icon {
         background: transparent !important;
         border: none !important;
+      }
+      /* Leaflet 기본 스타일 보정 */
+      .leaflet-container {
+        font-family: inherit;
+        background-color: #f8fafc;
       }
     </style>
     <script type="importmap">
