@@ -1,8 +1,8 @@
 
 {
-  "name": "freeswim-onion",
+  "name": "freeswimming",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,5 +28,5 @@
     "typescript": "^5.5.4",
     "vite": "^5.4.2"
   },
-  "description": "자유수영.kr - onionseehope 신규 저장소 버전"
+  "description": "자유수영.kr - 전국 수영장 실시간 정보 서비스 (hama-jung/freeswimming)"
 }
