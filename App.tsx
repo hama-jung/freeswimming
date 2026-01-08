@@ -19,24 +19,39 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = false): boolean {
-  const day = targetDate.getDay();
+  const dayIndex = targetDate.getDay(); // 0: 일, 1: 월, ..., 6: 토
   const currentMinutes = targetDate.getHours() * 60 + targetDate.getMinutes();
+  const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+  const todayName = dayNames[dayIndex];
+  
   const closed = pool.closedDays || "";
-  if (closed.includes("매주 월요일") && day === 1) return false;
-  if (closed.includes("매주 일요일") && day === 0) return false;
+  // 간단한 휴무일 체크
+  if (closed.includes(`매주 ${todayName}요일`)) return false;
+  
   const schedules = pool.freeSwimSchedule || [];
   const possibleSchedules = schedules.filter(s => {
-    if (day === 0 && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
-    if (day === 6 && (s.day === "토요일" || s.day === "주말/공휴일")) return true;
-    if (day >= 1 && day <= 5 && s.day === "평일(월-금)") return true;
+    // 1. 새로운 체크박스 기반 요일 문자열 체크 (예: "월, 수, 금"에 "월"이 포함되는지)
+    if (s.day.includes(todayName)) return true;
+    
+    // 2. 레거시(기존) 데이터 지원을 위한 하이브리드 체크
+    if (todayName === "일" && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
+    if (todayName === "토" && (s.day === "토요일" || s.day === "주말/공휴일")) return true;
+    if (dayIndex >= 1 && dayIndex <= 5) {
+      if (s.day === "평일(월-금)") return true;
+      if (s.day === `${todayName}요일`) return true;
+    }
     return false;
   });
+
   if (possibleSchedules.length === 0) return false;
+
   if (checkRealtime) {
     return possibleSchedules.some(s => {
+      const [startH, startM] = s.startTime.split(':').map(Number);
       const [endH, endM] = s.endTime.split(':').map(Number);
+      const startMin = startH * 60 + startM;
       const endMin = endH * 60 + endM;
-      return currentMinutes < endMin;
+      return currentMinutes >= startMin && currentMinutes < endMin;
     });
   }
   return true;
@@ -177,24 +192,6 @@ function App() {
             </div>
             <button onClick={() => setToastMessage(null)} className="text-white/50 hover:text-white p-1"><X size={20} /></button>
           </div>
-          
-          {toastMessage.code === 'PGRST204' && (
-            <div className="bg-black/20 p-4 rounded-2xl space-y-3">
-              <p className="text-xs font-bold text-white/80">해결 방법: Supabase SQL Editor에서 아래 명령어를 실행하세요.</p>
-              <code className="block text-[10px] font-mono bg-black/40 p-3 rounded-xl break-all whitespace-pre-wrap overflow-x-auto text-emerald-300">
-                ALTER TABLE pools ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
-              </code>
-              <button 
-                onClick={() => {
-                  navigator.clipboard.writeText("ALTER TABLE pools ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;");
-                  alert("SQL 명령어가 복사되었습니다.");
-                }}
-                className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all"
-              >
-                <Copy size={12} /> SQL 복사하기
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -245,10 +242,6 @@ function App() {
                   <button onClick={handleNearMe} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'}`}><LocateFixed size={18} /> 내주변</button>
                   <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${!isTodaySelected ? 'bg-slate-50 text-slate-300 border-slate-100' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300')}`}><CalendarCheck size={18} /> 오늘가능</button>
                 </div>
-              </div>
-              <div className="sm:hidden px-4 py-3 flex gap-2">
-                <button onClick={handleNearMe} className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 border-2 transition-all ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-700'}`}><LocateFixed size={18} /> 내주변</button>
-                <button onClick={() => setIsFilterOpen(true)} className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-900 text-white shadow-lg active:scale-90 transition-all"><Filter size={20} /></button>
               </div>
             </div>
           </div>

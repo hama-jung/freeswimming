@@ -15,7 +15,7 @@ export interface User {
   joinedAt: string;
 }
 
-export type DayType = "평일(월-금)" | "토요일" | "일요일" | "공휴일" | "주말/공휴일";
+export type DayType = string; 
 export type FeeCategory = "평일" | "주말/공휴일" | "전체";
 
 export interface FreeSwimSchedule {

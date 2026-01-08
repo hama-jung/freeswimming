@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, MapPin, Clock, DollarSign, ArrowLeft, Loader2, Search, CheckCircle2, ChevronDown, Map as MapIcon, Info, PlusCircle, RotateCcw, Trash2, Calendar, Waves, Thermometer, AlertCircle, Image as ImageIcon } from 'lucide-react';
+import { Save, MapPin, Clock, DollarSign, ArrowLeft, Loader2, Search, CheckCircle2, ChevronDown, Map as MapIcon, Info, PlusCircle, RotateCcw, Trash2, Calendar, Waves, Thermometer, AlertCircle, ImageIcon } from 'lucide-react';
 import { Pool, FreeSwimSchedule, FeeInfo, Region, HolidayRule } from '../types';
 import { REGIONS } from '../constants';
 import { searchLocationWithGemini, getCoordinatesFromAddress, MapSearchResult } from '../services/geminiService';
@@ -15,6 +15,8 @@ const DEFAULT_POOL_IMAGE = "https://images.unsplash.com/photo-1519315530759-3914
 const DRAFT_STORAGE_KEY = 'pool_form_draft_final';
 
 const WEEK_DAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+const DAY_SHORT_NAMES = ["월", "화", "수", "목", "금", "토", "일"];
+
 const WEEK_NUMBERS = [
     { label: "매주", value: 0 },
     { label: "매월 첫번째", value: 1 },
@@ -67,7 +69,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (draft) setHasDraft(true);
       
-      setSchedules([{ day: '평일(월-금)', startTime: '09:00', endTime: '18:00' }]);
+      setSchedules([{ day: '월, 화, 수, 목, 금', startTime: '09:00', endTime: '18:00' }]);
       setFees([{ type: 'adult', category: '전체', price: 5000 }]);
     }
   }, [initialData]);
@@ -123,9 +125,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
 
       const results = await searchLocationWithGemini(searchQuery, userLoc);
       setSearchResults(results);
-      if (results.length === 0) {
-          alert("검색 결과를 찾을 수 없습니다. 정확한 장소명(예: XX국민체육센터 수영장)으로 검색하거나 '주소 입력'을 이용해 주세요.");
-      }
     } catch (error) {
       console.error(error);
       alert("검색 중 오류가 발생했습니다.");
@@ -145,7 +144,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
         setIsSearching(true);
         const coords = await getCoordinatesFromAddress(fullAddr);
         if (coords) setSelectedCoords(coords);
-        else setSelectedCoords({ lat: 37.5665, lng: 126.9780 });
         setIsSearching(false);
 
         const matchedRegion = REGIONS.find(r => data.sido.includes(r));
@@ -201,8 +199,33 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     onSave(pool);
   };
 
-  const addSchedule = () => setSchedules([...schedules, { day: '평일(월-금)', startTime: '09:00', endTime: '18:00' }]);
+  const addSchedule = () => setSchedules([...schedules, { day: '월, 화, 수, 목, 금', startTime: '09:00', endTime: '18:00' }]);
   const removeSchedule = (idx: number) => setSchedules(schedules.filter((_, i) => i !== idx));
+  
+  const toggleDayInSchedule = (idx: number, dayName: string) => {
+    const next = [...schedules];
+    let currentDays = next[idx].day.split(', ').filter(d => d.trim() !== "");
+    
+    // 호환성 처리: 기존 데이터가 "평일(월-금)" 등일 경우 개별 요일로 전환
+    if (currentDays.length === 1 && (currentDays[0].includes("평일") || currentDays[0].includes("주말"))) {
+        if (currentDays[0] === "평일(월-금)") currentDays = ["월", "화", "수", "목", "금"];
+        else if (currentDays[0] === "주말/공휴일") currentDays = ["토", "일"];
+        else if (currentDays[0].endsWith("요일")) currentDays = [currentDays[0][0]];
+    }
+
+    if (currentDays.includes(dayName)) {
+      currentDays = currentDays.filter(d => d !== dayName);
+    } else {
+      currentDays.push(dayName);
+    }
+    
+    // 요일 순서대로 정렬 (월, 화, 수, 목, 금, 토, 일)
+    currentDays.sort((a, b) => DAY_SHORT_NAMES.indexOf(a) - DAY_SHORT_NAMES.indexOf(b));
+    
+    next[idx] = { ...next[idx], day: currentDays.join(', ') };
+    setSchedules(next);
+  };
+
   const updateSchedule = (idx: number, field: keyof FreeSwimSchedule, value: string) => {
     const next = [...schedules];
     next[idx] = { ...next[idx], [field]: value as any };
@@ -230,7 +253,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       {(isSubmitting || isSearching) && (
         <div className="fixed inset-0 z-[100] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
           <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
-          <p className="font-bold text-slate-800 text-center px-6">장소 정보를 가져오고 있습니다...</p>
+          <p className="font-bold text-slate-800 text-center px-6">정보를 처리하고 있습니다...</p>
         </div>
       )}
 
@@ -333,24 +356,46 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                     <PlusCircle className="w-4 h-4" /> 추가
                 </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {schedules.map((sch, idx) => (
-                    <div key={idx} className="flex flex-col md:flex-row gap-3 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div className="flex-1 md:flex-[0.5] relative">
-                            <select value={sch.day} onChange={e => updateSchedule(idx, 'day', e.target.value)} className="w-full pl-4 pr-10 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none appearance-none">
-                                <option value="평일(월-금)">평일(월-금)</option>
-                                <option value="토요일">토요일</option>
-                                <option value="일요일">일요일</option>
-                                <option value="공휴일">공휴일</option>
-                                <option value="주말/공휴일">주말/공휴일</option>
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <div key={idx} className="p-6 bg-slate-50 rounded-[32px] border border-slate-100 space-y-4">
+                        <div className="flex justify-between items-center mb-2">
+                           <label className="text-xs font-black text-slate-400 uppercase tracking-widest">운영 요일 선택</label>
+                           <button type="button" onClick={() => removeSchedule(idx)} className="text-red-400 hover:text-red-600 transition-colors">
+                              <Trash2 size={18} />
+                           </button>
                         </div>
-                        <div className="flex-1 flex gap-2 items-center">
-                            <input type="time" value={sch.startTime} onChange={e => updateSchedule(idx, 'startTime', e.target.value)} className="flex-1 p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-bold" />
-                            <span className="text-slate-400 font-bold px-1">~</span>
-                            <input type="time" value={sch.endTime} onChange={e => updateSchedule(idx, 'endTime', e.target.value)} className="flex-1 p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-bold" />
-                            <button type="button" onClick={() => removeSchedule(idx)} className="p-3.5 text-red-500 hover:bg-red-50 rounded-xl"><Trash2 className="w-5 h-5" /></button>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          {DAY_SHORT_NAMES.map(dayName => {
+                            const isActive = sch.day.includes(dayName);
+                            return (
+                              <button
+                                key={dayName}
+                                type="button"
+                                onClick={() => toggleDayInSchedule(idx, dayName)}
+                                className={`w-11 h-11 rounded-2xl text-base font-black transition-all border-2 shadow-sm ${
+                                  isActive 
+                                    ? 'bg-brand-600 border-brand-600 text-white' 
+                                    : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'
+                                }`}
+                              >
+                                {dayName}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex gap-3 items-center pt-2">
+                            <div className="flex-1 relative">
+                                <label className="block text-[10px] font-black text-slate-400 mb-1 ml-1">시작 시간</label>
+                                <input type="time" value={sch.startTime} onChange={e => updateSchedule(idx, 'startTime', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-black outline-none" />
+                            </div>
+                            <div className="pt-5 text-slate-300 font-bold">~</div>
+                            <div className="flex-1 relative">
+                                <label className="block text-[10px] font-black text-slate-400 mb-1 ml-1">종료 시간</label>
+                                <input type="time" value={sch.endTime} onChange={e => updateSchedule(idx, 'endTime', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-black outline-none" />
+                            </div>
                         </div>
                     </div>
                 ))}
