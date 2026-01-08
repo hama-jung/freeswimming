@@ -4,21 +4,26 @@ import react from '@vitejs/plugin-react';
 import process from 'node:process';
 
 export default defineConfig(({ mode }) => {
-  // loadEnv를 사용하여 .env 파일과 시스템 환경 변수를 모두 로드합니다.
-  // 세 번째 인자를 ''로 설정하여 접두사(VITE_)가 없는 변수도 로드합니다.
+  // Vercel은 환경 변수를 시스템 env에 직접 주입하므로, loadEnv로 이를 캡처합니다.
   const env = loadEnv(mode, process.cwd(), '');
   
+  // Vercel 빌드 타임에 사용할 변수들 우선순위 정립
+  const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseKey = env.VITE_SUPABASE_KEY || env.SUPABASE_KEY || process.env.SUPABASE_KEY || "";
+  const apiKey = env.API_KEY || process.env.API_KEY || "";
+
   return {
     plugins: [react()],
     define: {
-      // 빌드 시점에 process.env.VARIABLE 형태의 코드를 실제 값으로 치환합니다.
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || ""),
-      'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || process.env.SUPABASE_URL || ""),
-      'process.env.SUPABASE_KEY': JSON.stringify(env.SUPABASE_KEY || process.env.SUPABASE_KEY || ""),
+      // 1. process.env 방식 지원
+      'process.env.API_KEY': JSON.stringify(apiKey),
+      'process.env.SUPABASE_URL': JSON.stringify(supabaseUrl),
+      'process.env.SUPABASE_KEY': JSON.stringify(supabaseKey),
       
-      // 혹시 모를 접근 방식을 위해 개별 속성도 정의합니다.
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || env.VITE_SUPABASE_URL || ""),
-      'import.meta.env.VITE_SUPABASE_KEY': JSON.stringify(env.SUPABASE_KEY || env.VITE_SUPABASE_KEY || ""),
+      // 2. import.meta.env 방식 지원 (Vite 표준)
+      // 주의: 빌드 엔진이 문자열 치환을 하므로 아래와 같이 정확한 키를 지정합니다.
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
+      'import.meta.env.VITE_SUPABASE_KEY': JSON.stringify(supabaseKey),
     },
     build: {
       outDir: 'dist',
