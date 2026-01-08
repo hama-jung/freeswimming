@@ -2,35 +2,35 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Pool } from "../types";
 
-// API 키를 환경 변수에서 직접 가져와 초기화합니다.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+/**
+ * 수영장 정보 AI 3줄 요약 생성
+ */
 export const generatePoolSummary = async (pool: Pool): Promise<string> => {
   try {
     const prompt = `
       당신은 수영 전문가 AI 어시스턴트입니다.
       다음 수영장 정보를 바탕으로 사용자에게 도움이 될만한 3줄 요약 분석을 제공해주세요.
-      친근하고 전문적인 말투(해요체)를 사용하세요.
+      각 줄은 명확한 특징이나 팁을 담아야 하며, 친근하고 전문적인 말투(해요체)를 사용하세요.
 
       수영장 이름: ${pool.name}
       위치: ${pool.address}
-      시설: ${pool.length}m 레인 ${pool.lanes}개, 유아풀 ${pool.hasKidsPool ? '있음' : '음'}
+      시설: ${pool.length}m 레인 ${pool.lanes}개, 유아풀 ${pool.hasKidsPool ? '있음' : '없음'}
       자유수영 시간: ${JSON.stringify(pool.freeSwimSchedule)}
       휴무일: ${pool.closedDays}
-      리뷰 내용: ${pool.reviews.map(r => r.content).join(' / ')}
+      리뷰 요약: ${pool.reviews.length > 0 ? pool.reviews.map(r => r.content).join(' / ') : '아직 리뷰가 없습니다.'}
     `;
 
-    // 가벼운 요약 작업에는 gemini-3-flash-preview 모델을 사용합니다.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
 
-    // response.text는 메서드가 아닌 속성입니다.
-    return response.text || "AI 분석을 불러올 수 없습니다.";
+    return response.text?.trim() || "수영장 정보를 분석하고 있습니다.";
   } catch (error) {
-    console.error("Gemini API Error (Summary):", error);
-    return "AI 서비스 연결 상태가 좋지 않아 분석을 완료할 수 없습니다.";
+    console.error("Gemini Summary Error:", error);
+    return "현재 시설 정보를 분석하는 중에 잠시 문제가 발생했습니다.";
   }
 };
 
@@ -41,67 +41,87 @@ export interface MapSearchResult {
   lng: number;
 }
 
+/**
+ * AI를 이용한 수영장 위치 및 좌표 검색
+ */
 export const searchLocationWithGemini = async (query: string, userLocation?: {lat: number, lng: number}): Promise<MapSearchResult[]> => {
   try {
-    // 복잡한 추론 작업에는 gemini-3-pro-preview 모델을 사용합니다.
-    const modelName = "gemini-3-pro-preview"; 
-    
-    // 검색 그라운딩 도구를 구성합니다.
-    const config = {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING, description: "Official name of the facility" },
-            address: { type: Type.STRING, description: "Full road address in Korea" },
-            lat: { type: Type.NUMBER, description: "Latitude" },
-            lng: { type: Type.NUMBER, description: "Longitude" }
-          },
-          required: ["name", "address", "lat", "lng"]
-        }
-      }
-    };
-
+    // 검색어 정제
     const searchQuery = query.includes('수영장') ? query : `${query} 수영장`;
-    const prompt = `Find the precise road address and GPS coordinates for "${searchQuery}" in South Korea using Google Search. 
-    If the exact name is not found, suggest the most relevant public swimming pools or sports centers in that area.
-    Current user approximate location for context: ${userLocation ? `${userLocation.lat}, ${userLocation.lng}` : "South Korea"}.
-    Ensure the coordinates are valid numbers for the South Korea region.`;
-
+    
+    // 장소 검색은 gemini-3-flash-preview가 빠르고 JSON 스키마를 잘 따릅니다.
     const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: config,
+      model: 'gemini-3-flash-preview',
+      contents: `대한민국 내에 위치한 "${searchQuery}"에 대한 정확한 도로명 주소와 위경도 좌표(GPS)를 찾아주세요. 
+      현재 사용자 위치 기준(${userLocation ? `${userLocation.lat}, ${userLocation.lng}` : "대한민국"})에서 가장 근접하고 정확한 수영장 시설 정보를 반환해야 합니다.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: "시설의 정식 명칭" },
+              address: { type: Type.STRING, description: "대한민국 표준 도로명 주소" },
+              lat: { type: Type.NUMBER, description: "위도 (33~39 사이의 숫자)" },
+              lng: { type: Type.NUMBER, description: "경도 (124~132 사이의 숫자)" }
+            },
+            required: ["name", "address", "lat", "lng"]
+          }
+        }
+      },
     });
 
-    const text = response.text || "[]";
-    try {
-        const results = JSON.parse(text);
-        return Array.isArray(results) ? results : [];
-    } catch (parseError) {
-        console.error("JSON Parsing Error from Gemini Search:", text);
-        return [];
-    }
-  } catch (error: any) {
-    console.error("Gemini Search API Error:", error.message);
+    const rawText = response.text || "[]";
+    
+    // 마크다운 코드 블록 등이 포함되어 있을 경우를 대비한 정제 로직
+    const cleanJsonText = rawText.replace(/```json|```/g, "").trim();
+    const results = JSON.parse(cleanJsonText);
+
+    if (!Array.isArray(results)) return [];
+
+    // 한국 지역을 벗어나는 좌표 필터링 (잘못된 데이터 방지)
+    return results.filter(item => 
+      item.lat >= 33 && item.lat <= 39 && 
+      item.lng >= 124 && item.lng <= 132
+    );
+  } catch (error) {
+    console.error("Gemini Location Search Error:", error);
     return [];
   }
 };
 
+/**
+ * 주소 텍스트로부터 좌표 추출
+ */
 export const getCoordinatesFromAddress = async (address: string): Promise<{lat: number, lng: number} | null> => {
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: `Find the precise GPS coordinates (lat, lng) for this South Korean address: "${address}". 
-            Respond ONLY with a JSON object: {"lat": number, "lng": number}`,
-            config: { responseMimeType: "application/json" }
-        });
-        return JSON.parse(response.text || "null");
-    } catch (e) {
-        console.error("Coordinate fetch error:", e);
-        return null;
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `다음 대한민국 주소의 정확한 위도(lat)와 경도(lng) 좌표를 알려주세요: "${address}"`,
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            lat: { type: Type.NUMBER },
+            lng: { type: Type.NUMBER }
+          },
+          required: ["lat", "lng"]
+        }
+      }
+    });
+
+    const rawText = response.text || "null";
+    const cleanJsonText = rawText.replace(/```json|```/g, "").trim();
+    const coords = JSON.parse(cleanJsonText);
+
+    if (coords && typeof coords.lat === 'number' && typeof coords.lng === 'number') {
+      return coords;
     }
+    return null;
+  } catch (e) {
+    console.error("Coordinate retrieval error:", e);
+    return null;
+  }
 }
