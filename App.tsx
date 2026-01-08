@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle } from 'lucide-react';
+import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy } from 'lucide-react';
 import { Pool, Region } from './types';
 import { MOCK_POOLS, REGIONS } from './constants';
 import PoolCard from './components/PoolCard';
@@ -49,7 +49,7 @@ function App() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingPool, setEditingPool] = useState<Pool | undefined>(undefined);
-  const [toastMessage, setToastMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
+  const [toastMessage, setToastMessage] = useState<{text: string, type: 'success'|'error', code?: string} | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<Region | "내주변">("전체");
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,9 +78,11 @@ function App() {
     }
   };
 
-  const showToast = (text: string, type: 'success'|'error' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 6000);
+  const showToast = (text: string, type: 'success'|'error' = 'success', code?: string) => {
+    setToastMessage({ text, type, code });
+    if (type === 'success') {
+      setTimeout(() => setToastMessage(null), 5000);
+    }
   };
 
   const handleUpdatePoolData = async (updatedPool: Pool) => {
@@ -94,8 +96,7 @@ function App() {
         if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
         showToast("정보가 성공적으로 반영되었습니다.", 'success');
       } else {
-        // 백엔드(Supabase)에서 반환한 실제 에러 메시지를 보여줍니다.
-        showToast(`저장 실패: ${result.error}`, 'error');
+        showToast(result.error || "저장 중 오류가 발생했습니다.", 'error', result.code);
       }
     } catch (e: any) {
       showToast(`시스템 오류: ${e.message}`, 'error');
@@ -155,41 +156,48 @@ function App() {
     return list;
   }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate, isTodaySelected, view]);
 
-  if (view === 'form') {
-    return (
-      <PoolFormPage 
-        initialData={editingPool} 
-        onSave={async (p) => {
-          setEditingPool(undefined);
-          setView('list');
-          await handleUpdatePoolData(p);
-        }} 
-        onCancel={() => { setView('list'); setEditingPool(undefined); }} 
-      />
-    );
-  }
-
   return (
     <div className={`flex flex-col font-sans bg-[#f8fafc] ${displayMode === 'map' && view === 'list' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {isLoading && (
         <div className="fixed inset-0 z-[100] bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center">
           <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
-          <p className="font-bold text-slate-600">데이터를 동기화하고 있습니다...</p>
+          <p className="font-bold text-slate-600">데이터를 처리 중입니다...</p>
         </div>
       )}
 
       {toastMessage && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-4 transition-all ${toastMessage.type === 'success' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white'}`}>
-          {toastMessage.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <AlertTriangle className="w-5 h-5 text-yellow-300" />}
-          <div className="flex flex-col">
-            <span className="text-sm font-black">{toastMessage.type === 'success' ? '성공' : '오류 발생'}</span>
-            <span className="text-xs font-bold opacity-80">{toastMessage.text}</span>
+        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-lg p-6 rounded-[32px] shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom-4 transition-all ${toastMessage.type === 'success' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white'}`}>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              {toastMessage.type === 'success' ? <CheckCircle className="w-6 h-6 text-emerald-400" /> : <AlertTriangle className="w-6 h-6 text-yellow-300" />}
+              <div className="flex flex-col">
+                <span className="text-base font-black">{toastMessage.type === 'success' ? '성공' : '오류 발생'}</span>
+                <span className="text-sm font-bold opacity-90">{toastMessage.text}</span>
+              </div>
+            </div>
+            <button onClick={() => setToastMessage(null)} className="text-white/50 hover:text-white p-1"><X size={20} /></button>
           </div>
-          <button onClick={() => setToastMessage(null)} className="ml-2 text-white/50 hover:text-white"><X size={16} /></button>
+          
+          {toastMessage.code === 'PGRST204' && (
+            <div className="bg-black/20 p-4 rounded-2xl space-y-3">
+              <p className="text-xs font-bold text-white/80">해결 방법: Supabase SQL Editor에서 아래 명령어를 실행하세요.</p>
+              <code className="block text-[10px] font-mono bg-black/40 p-3 rounded-xl break-all whitespace-pre-wrap overflow-x-auto text-emerald-300">
+                ALTER TABLE pools ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
+              </code>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText("ALTER TABLE pools ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;");
+                  alert("SQL 명령어가 복사되었습니다.");
+                }}
+                className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 transition-all"
+              >
+                <Copy size={12} /> SQL 복사하기
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 헤더 및 나머지 UI 동일 (생략하지 않음) */}
       <header className="bg-white border-b border-slate-100 z-50 sticky top-0 shrink-0">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
           <button className="flex items-center gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
@@ -210,26 +218,56 @@ function App() {
         </div>
       </header>
 
-      <main className={`flex-1 relative ${displayMode === 'map' && view === 'list' ? 'overflow-hidden' : ''}`}>
-        {displayMode === 'map' && view === 'list' ? (
-          <div className="absolute inset-0">
-            <KoreaMap pools={processedPools} onSelectPool={setSelectedPoolDetail} userLocation={userLocation} selectedRegion={selectedRegion} onRequestLocation={handleNearMe} />
-          </div>
-        ) : (
-          <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 py-8 sm:py-16">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
-              {processedPools.map(p => <PoolCard key={p.id} pool={p} onClick={setSelectedPoolDetail} distance={p.distance} />)}
+      {view === 'form' ? (
+        <PoolFormPage 
+          initialData={editingPool} 
+          onSave={async (p) => {
+            setEditingPool(undefined);
+            setView('list');
+            await handleUpdatePoolData(p);
+          }} 
+          onCancel={() => { setView('list'); setEditingPool(undefined); }} 
+        />
+      ) : (
+        <>
+          <div className="bg-white border-b border-slate-100 z-40 sticky top-16 sm:top-20 shrink-0">
+            <div className="max-w-[1280px] mx-auto">
+              <div className="hidden sm:flex px-6 py-4 gap-4 items-center border-b border-slate-50">
+                <div className="relative flex-1 max-w-md">
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="어느 수영장을 찾으세요?" className="w-full pl-12 pr-4 h-14 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all outline-none" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <div className="relative w-56 group">
+                    <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-14 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-black outline-none" />
+                    <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  </div>
+                  <button onClick={handleNearMe} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'}`}><LocateFixed size={18} /> 내주변</button>
+                  <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${!isTodaySelected ? 'bg-slate-50 text-slate-300 border-slate-100' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300')}`}><CalendarCheck size={18} /> 오늘가능</button>
+                </div>
+              </div>
+              <div className="sm:hidden px-4 py-3 flex gap-2">
+                <button onClick={handleNearMe} className={`flex-1 h-12 rounded-2xl font-black text-sm flex items-center justify-center gap-2 border-2 transition-all ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-700'}`}><LocateFixed size={18} /> 내주변</button>
+                <button onClick={() => setIsFilterOpen(true)} className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-900 text-white shadow-lg active:scale-90 transition-all"><Filter size={20} /></button>
+              </div>
             </div>
-            {processedPools.length === 0 && (
-              <div className="py-24 sm:py-32 text-center flex flex-col items-center justify-center bg-white rounded-[40px] border-2 border-dashed border-slate-100">
-                <Info size={40} className="text-slate-300 mb-6" />
-                <h3 className="text-xl font-black text-slate-800 mb-2">검색 결과가 없습니다</h3>
-                <p className="text-sm text-slate-400 font-bold">필터 설정을 변경해 보세요.</p>
+          </div>
+
+          <main className={`flex-1 relative ${displayMode === 'map' ? 'overflow-hidden' : ''}`}>
+            {displayMode === 'map' ? (
+              <div className="absolute inset-0">
+                <KoreaMap pools={processedPools} onSelectPool={setSelectedPoolDetail} userLocation={userLocation} selectedRegion={selectedRegion} onRequestLocation={handleNearMe} />
+              </div>
+            ) : (
+              <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 py-8 sm:py-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
+                  {processedPools.map(p => <PoolCard key={p.id} pool={p} onClick={setSelectedPoolDetail} distance={p.distance} />)}
+                </div>
               </div>
             )}
-          </div>
-        )}
-      </main>
+          </main>
+        </>
+      )}
 
       {selectedPoolDetail && (
         <PoolDetail 
@@ -238,13 +276,11 @@ function App() {
           onUpdatePool={handleUpdatePoolData}
           onEditRequest={(p) => { setEditingPool(p); setView('form'); setSelectedPoolDetail(null); }}
           onDeleteRequest={async (id) => { 
-            if(confirm('이 수영장 정보를 삭제할까요?')) {
+            if(confirm('삭제하시겠습니까?')) {
               setIsLoading(true);
               const success = await deletePool(id); 
               await loadData(); 
               setSelectedPoolDetail(null); 
-              if (success) showToast('정보가 삭제되었습니다.');
-              else showToast('삭제 실패했습니다.', 'error');
               setIsLoading(false);
             }
           }}

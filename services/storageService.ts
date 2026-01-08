@@ -3,12 +3,16 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Pool, Review, PoolHistory } from '../types';
 
 /**
- * Vite 빌드 타임에 환경 변수가 주입되도록 표준 형식을 사용합니다.
- * Vercel 환경 변수에 VITE_SUPABASE_URL, VITE_SUPABASE_KEY가 등록되어 있어야 합니다.
+ * Vite 및 Vercel 환경에서 가장 안정적인 환경 변수 로드 방식
  */
-// Fix: Use process.env instead of import.meta.env to resolve TypeScript 'Property env does not exist on type ImportMeta' errors.
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_KEY || "";
+const getEnv = (key: string) => {
+  return (import.meta as any).env?.[`VITE_${key}`] || 
+         (import.meta as any).env?.[key] || 
+         (process.env as any)?.[key] || "";
+};
+
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseKey = getEnv('SUPABASE_KEY');
 
 let supabase: SupabaseClient | null = null;
 
@@ -17,14 +21,12 @@ if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
     supabase = createClient(supabaseUrl, supabaseKey, {
       auth: { persistSession: false }
     });
-    console.log("[Storage] Supabase client linked.");
+    console.log("[Storage] Supabase client initialized.");
   } catch (e) {
     console.error("[Storage] Supabase init failed:", e);
   }
 } else {
-  // 배포된 환경에서 이 경고가 뜬다면 Vercel 설정에서 'VITE_' 접두사를 붙여 변수를 추가했는지 확인하세요.
-  console.warn("[Storage] Supabase credentials missing or invalid format.");
-  console.debug("URL exists:", !!supabaseUrl, "Key exists:", !!supabaseKey);
+  console.warn("[Storage] Supabase credentials missing. Check Vercel/Vite Environment Variables.");
 }
 
 const STORAGE_KEY = 'swimming_app_universal_pools';
@@ -74,16 +76,16 @@ export const getStoredPools = async (): Promise<Pool[]> => {
   return local ? JSON.parse(local) : [];
 };
 
-export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string}> => {
+export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string, code?: string}> => {
   if (!supabase) {
     return { 
       success: false, 
-      error: "Supabase 연결 정보가 없습니다. Vercel 환경 변수(VITE_SUPABASE_URL)를 확인하세요." 
+      error: "Supabase 연결 정보가 없습니다. Vercel 환경 변수를 확인하세요." 
     };
   }
 
   try {
-    const payload = {
+    const payload: any = {
       id: pool.id,
       name: pool.name,
       address: pool.address,
@@ -110,14 +112,22 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
 
     if (error) {
       console.error("[Storage] DB Upsert Error:", error);
-      return { success: false, error: `${error.message} (${error.code})` };
+      // 특정 에러 코드(PGRST204: 컬럼 없음)에 대한 친절한 설명 추가
+      if (error.code === 'PGRST204') {
+        return { 
+          success: false, 
+          code: error.code,
+          error: "데이터베이스 구조가 최신이 아닙니다. SQL Editor에서 'is_public' 컬럼을 추가해야 합니다." 
+        };
+      }
+      return { success: false, code: error.code, error: error.message };
     }
 
-    // 히스토리 비동기 저장
+    // 히스토리 저장
     supabase.from('pool_history').insert({
       pool_id: pool.id,
       snapshot_data: pool
-    }).catch(e => console.warn("History save background error:", e));
+    }).catch(() => {});
 
     return { success: true };
   } catch (e: any) {
