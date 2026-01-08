@@ -20,6 +20,8 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = false): boolean {
   const dayIndex = targetDate.getDay(); // 0: 일, 1: 월, ..., 6: 토
+  const dayOfMonth = targetDate.getDate();
+  const weekOfMonth = Math.ceil(dayOfMonth / 7);
   const currentMinutes = targetDate.getHours() * 60 + targetDate.getMinutes();
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
   const todayName = dayNames[dayIndex];
@@ -30,10 +32,15 @@ function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = 
   
   const schedules = pool.freeSwimSchedule || [];
   const possibleSchedules = schedules.filter(s => {
-    // 1. 새로운 체크박스 기반 요일 문자열 체크 (예: "월, 수, 금"에 "월"이 포함되는지)
+    // 1. 주차 체크 (weeks 정보가 있을 경우)
+    const scheduleWeeks = s.weeks || [0];
+    const isCorrectWeek = scheduleWeeks.includes(0) || scheduleWeeks.includes(weekOfMonth);
+    if (!isCorrectWeek) return false;
+
+    // 2. 요일 체크
     if (s.day.includes(todayName)) return true;
     
-    // 2. 레거시(기존) 데이터 지원을 위한 하이브리드 체크
+    // 3. 레거시 데이터 지원
     if (todayName === "일" && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
     if (todayName === "토" && (s.day === "토요일" || s.day === "주말/공휴일")) return true;
     if (dayIndex >= 1 && dayIndex <= 5) {

@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-// Added Clock and DollarSign to imports from lucide-react to fix missing name errors on lines 160 and 175
 import { X, MapPin, Calendar, Star, Edit2, Sparkles, Waves, Thermometer, AlertCircle, Settings, History, Info, Baby, Footprints, Eye, EyeOff, RotateCcw, Loader2, Map as MapIcon, Phone, Clock, DollarSign } from 'lucide-react';
-import { Pool, Review } from '../types';
+import { Pool, Review, FreeSwimSchedule } from '../types';
 import { generatePoolSummary } from '../services/geminiService';
 import VersionHistory from './VersionHistory';
 
@@ -56,6 +55,11 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
   const openInGoogleMaps = () => {
     const url = `https://www.google.com/maps/search/?api=1&query=${pool.lat},${pool.lng}`;
     window.open(url, '_blank');
+  };
+
+  const formatWeekInfo = (weeks?: number[]) => {
+    if (!weeks || weeks.includes(0)) return "매주";
+    return weeks.map(w => `${w}주`).join(', ') + '차';
   };
 
   const holidayLabel = pool.closedDays === 'NONE' ? '연중무휴' : 
@@ -162,9 +166,15 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                   </h3>
                   <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm space-y-4">
                     {pool.freeSwimSchedule.length > 0 ? pool.freeSwimSchedule.map((sch, i) => (
-                      <div key={i} className="flex items-center justify-between bg-slate-50 p-5 rounded-2xl border border-slate-100/50">
-                        <span className="text-lg font-black text-slate-700 w-32">{sch.day}</span>
-                        <span className="text-xl font-black text-brand-600">{sch.startTime} ~ {sch.endTime}</span>
+                      <div key={i} className="bg-slate-50 p-6 rounded-2xl border border-slate-100/50 space-y-3">
+                        <div className="flex justify-between items-center">
+                           <span className="text-sm font-black text-brand-500 uppercase tracking-widest">{formatWeekInfo(sch.weeks)}</span>
+                           <span className="text-lg font-black text-slate-800">{sch.day}</span>
+                        </div>
+                        <div className="h-px bg-slate-200/50"></div>
+                        <div className="flex justify-end">
+                           <span className="text-2xl font-black text-slate-900 tracking-tight">{sch.startTime} ~ {sch.endTime}</span>
+                        </div>
                       </div>
                     )) : <p className="text-base text-slate-400 text-center py-4 font-bold">등록된 시간표가 없습니다.</p>}
                   </div>

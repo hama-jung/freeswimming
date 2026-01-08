@@ -22,6 +22,7 @@ export interface FreeSwimSchedule {
   day: DayType;
   startTime: string;
   endTime: string;
+  weeks?: number[]; // 0: 매주, 1: 1주차, 2: 2주차, 3: 3주차, 4: 4주차, 5: 5주차
 }
 
 export interface FeeInfo {

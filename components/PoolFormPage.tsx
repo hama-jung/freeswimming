@@ -16,6 +16,14 @@ const DRAFT_STORAGE_KEY = 'pool_form_draft_final';
 
 const WEEK_DAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
 const DAY_SHORT_NAMES = ["월", "화", "수", "목", "금", "토", "일"];
+const WEEK_NUMBER_OPTIONS = [
+  { label: "매주", value: 0 },
+  { label: "1주", value: 1 },
+  { label: "2주", value: 2 },
+  { label: "3주", value: 3 },
+  { label: "4주", value: 4 },
+  { label: "5주", value: 5 },
+];
 
 const WEEK_NUMBERS = [
     { label: "매주", value: 0 },
@@ -29,7 +37,6 @@ const WEEK_NUMBERS = [
 const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialData }) => {
   const isEditMode = !!initialData;
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
   
   // 장소 검색 관련 상태
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,10 +73,8 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     if (initialData) {
       applyData(initialData);
     } else {
-      const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (draft) setHasDraft(true);
-      
-      setSchedules([{ day: '월, 화, 수, 목, 금', startTime: '09:00', endTime: '18:00' }]);
+      // 요일 기본값 없음 (빈 문자열), 주차 기본값 매주 (0)
+      setSchedules([{ day: '', startTime: '09:00', endTime: '18:00', weeks: [0] }]);
       setFees([{ type: 'adult', category: '전체', price: 5000 }]);
     }
   }, [initialData]);
@@ -96,19 +101,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       setTemporaryHolidayEnabled(data.holidayOptions.temporaryHolidayEnabled);
       setHolidayRules(data.holidayOptions.rules || []);
     }
-  };
-
-  const loadDraft = () => {
-    const draft = localStorage.getItem(DRAFT_STORAGE_KEY);
-    if (draft) {
-      applyData(JSON.parse(draft));
-      setHasDraft(false);
-    }
-  };
-
-  const clearDraft = () => {
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setHasDraft(false);
   };
 
   const handleSearchLocation = async () => {
@@ -169,6 +161,13 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       return;
     }
 
+    // 요일이 하나도 선택되지 않은 스케줄 체크
+    const invalidSchedule = schedules.find(s => !s.day.trim());
+    if (invalidSchedule) {
+      alert("자유수영 시간표의 모든 항목에 대해 최소 하나 이상의 요일을 선택해 주세요.");
+      return;
+    }
+
     setIsSubmitting(true);
     
     const rulesSummary = holidayRules
@@ -195,11 +194,11 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       reviews: initialData?.reviews || [],
     };
 
-    clearDraft();
     onSave(pool);
   };
 
-  const addSchedule = () => setSchedules([...schedules, { day: '월, 화, 수, 목, 금', startTime: '09:00', endTime: '18:00' }]);
+  // 새 스케줄 추가 시 요일은 빈 값, 주차는 매주(0) 기본값
+  const addSchedule = () => setSchedules([...schedules, { day: '', startTime: '09:00', endTime: '18:00', weeks: [0] }]);
   const removeSchedule = (idx: number) => setSchedules(schedules.filter((_, i) => i !== idx));
   
   const toggleDayInSchedule = (idx: number, dayName: string) => {
@@ -219,10 +218,33 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       currentDays.push(dayName);
     }
     
-    // 요일 순서대로 정렬 (월, 화, 수, 목, 금, 토, 일)
     currentDays.sort((a, b) => DAY_SHORT_NAMES.indexOf(a) - DAY_SHORT_NAMES.indexOf(b));
-    
     next[idx] = { ...next[idx], day: currentDays.join(', ') };
+    setSchedules(next);
+  };
+
+  const toggleWeekInSchedule = (idx: number, weekNum: number) => {
+    const next = [...schedules];
+    let currentWeeks = next[idx].weeks || [0];
+    
+    if (weekNum === 0) {
+      // '매주'를 누르면 다른 모든 주차 해제
+      currentWeeks = [0];
+    } else {
+      // 특정 주차를 누르면 '매주' 해제
+      if (currentWeeks.includes(0)) currentWeeks = [];
+      
+      if (currentWeeks.includes(weekNum)) {
+        currentWeeks = currentWeeks.filter(w => w !== weekNum);
+        // 아무것도 선택되지 않으면 다시 '매주'로 복구
+        if (currentWeeks.length === 0) currentWeeks = [0];
+      } else {
+        currentWeeks.push(weekNum);
+      }
+      currentWeeks.sort((a, b) => a - b);
+    }
+    
+    next[idx] = { ...next[idx], weeks: currentWeeks };
     setSchedules(next);
   };
 
@@ -269,19 +291,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       </div>
 
       <main className="max-w-4xl mx-auto px-4 py-8 pb-32">
-        {hasDraft && !isEditMode && (
-          <div className="mb-8 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between">
-             <div className="flex items-center gap-3 text-amber-800 font-medium text-sm">
-                <RotateCcw className="w-5 h-5" />
-                <span>작성 중이던 데이터가 있습니다.</span>
-             </div>
-             <div className="flex gap-2">
-                <button onClick={clearDraft} className="text-sm text-amber-600 font-bold px-3">삭제</button>
-                <button onClick={loadDraft} className="bg-amber-500 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-sm">복구</button>
-             </div>
-          </div>
-        )}
-
         <form id="pool-form-page" onSubmit={handleSubmit} className="space-y-8">
           
           <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
@@ -356,45 +365,72 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                     <PlusCircle className="w-4 h-4" /> 추가
                 </button>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-8">
                 {schedules.map((sch, idx) => (
-                    <div key={idx} className="p-6 bg-slate-50 rounded-[32px] border border-slate-100 space-y-4">
-                        <div className="flex justify-between items-center mb-2">
-                           <label className="text-xs font-black text-slate-400 uppercase tracking-widest">운영 요일 선택</label>
-                           <button type="button" onClick={() => removeSchedule(idx)} className="text-red-400 hover:text-red-600 transition-colors">
+                    <div key={idx} className="p-8 bg-slate-50 rounded-[40px] border border-slate-100 space-y-6 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4">
+                           <button type="button" onClick={() => removeSchedule(idx)} className="text-slate-300 hover:text-red-500 transition-colors p-2 bg-white rounded-full shadow-sm border border-slate-100">
                               <Trash2 size={18} />
                            </button>
                         </div>
+
+                        <div className="space-y-3">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">1. 운영 주차 선택 (매주 기본)</label>
+                           <div className="flex flex-wrap gap-2">
+                              {WEEK_NUMBER_OPTIONS.map(opt => {
+                                const isActive = (sch.weeks || [0]).includes(opt.value);
+                                return (
+                                  <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => toggleWeekInSchedule(idx, opt.value)}
+                                    className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all border-2 shadow-sm ${
+                                      isActive 
+                                        ? 'bg-slate-900 border-slate-900 text-white' 
+                                        : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                           </div>
+                        </div>
                         
-                        <div className="flex flex-wrap gap-2">
-                          {DAY_SHORT_NAMES.map(dayName => {
-                            const isActive = sch.day.includes(dayName);
-                            return (
-                              <button
-                                key={dayName}
-                                type="button"
-                                onClick={() => toggleDayInSchedule(idx, dayName)}
-                                className={`w-11 h-11 rounded-2xl text-base font-black transition-all border-2 shadow-sm ${
-                                  isActive 
-                                    ? 'bg-brand-600 border-brand-600 text-white' 
-                                    : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'
-                                }`}
-                              >
-                                {dayName}
-                              </button>
-                            );
-                          })}
+                        <div className="space-y-3">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">2. 운영 요일 선택 (필수)</label>
+                           <div className="flex flex-wrap gap-2">
+                              {DAY_SHORT_NAMES.map(dayName => {
+                                const isActive = sch.day.includes(dayName);
+                                return (
+                                  <button
+                                    key={dayName}
+                                    type="button"
+                                    onClick={() => toggleDayInSchedule(idx, dayName)}
+                                    className={`w-11 h-11 rounded-2xl text-base font-black transition-all border-2 shadow-sm ${
+                                      isActive 
+                                        ? 'bg-brand-600 border-brand-600 text-white' 
+                                        : 'bg-white border-slate-100 text-slate-400 hover:border-slate-300'
+                                    }`}
+                                  >
+                                    {dayName}
+                                  </button>
+                                );
+                              })}
+                           </div>
+                           {!sch.day && <p className="text-[10px] text-red-400 font-bold ml-1">* 요일을 선택해 주세요.</p>}
                         </div>
 
-                        <div className="flex gap-3 items-center pt-2">
-                            <div className="flex-1 relative">
-                                <label className="block text-[10px] font-black text-slate-400 mb-1 ml-1">시작 시간</label>
-                                <input type="time" value={sch.startTime} onChange={e => updateSchedule(idx, 'startTime', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-black outline-none" />
-                            </div>
-                            <div className="pt-5 text-slate-300 font-bold">~</div>
-                            <div className="flex-1 relative">
-                                <label className="block text-[10px] font-black text-slate-400 mb-1 ml-1">종료 시간</label>
-                                <input type="time" value={sch.endTime} onChange={e => updateSchedule(idx, 'endTime', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-sm font-black outline-none" />
+                        <div className="space-y-3">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">3. 운영 시간 입력</label>
+                            <div className="flex gap-3 items-center">
+                                <div className="flex-1 relative group">
+                                    <input type="time" value={sch.startTime} onChange={e => updateSchedule(idx, 'startTime', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-base font-black outline-none focus:ring-2 focus:ring-brand-500" />
+                                </div>
+                                <div className="text-slate-300 font-bold">~</div>
+                                <div className="flex-1 relative group">
+                                    <input type="time" value={sch.endTime} onChange={e => updateSchedule(idx, 'endTime', e.target.value)} className="w-full p-4 bg-white border border-slate-200 rounded-2xl text-base font-black outline-none focus:ring-2 focus:ring-brand-500" />
+                                </div>
                             </div>
                         </div>
                     </div>
