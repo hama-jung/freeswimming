@@ -23,15 +23,16 @@ function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = 
   const currentMinutes = targetDate.getHours() * 60 + targetDate.getMinutes();
 
   const closed = pool.closedDays || "";
+  // 간단한 요일 체크 (추후 정교한 holidayOptions 체크로 확장 가능)
   if (closed.includes("매주 월요일") && day === 1) return false;
   if (closed.includes("매주 일요일") && day === 0) return false;
   
-  const schedules = pool.freeSwimSchedule;
+  const schedules = pool.freeSwimSchedule || [];
   const possibleSchedules = schedules.filter(s => {
     if (day === 0 && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
     if (day === 6 && (s.day === "토요일" || s.day === "주말/공휴일")) return true;
     if (day >= 1 && day <= 5 && s.day === "평일(월-금)") return true;
-    if ((s.day as any) === "전체") return true;
+    if (s.day === "공휴일") return false; // 기본적으로 평일/주말 위주 체크
     return false;
   });
 
@@ -72,14 +73,16 @@ function App() {
     setIsLoading(true);
     try {
       const stored = await getStoredPools();
-      if (stored.length > 0) {
+      if (stored && stored.length > 0) {
         setPools(stored);
       } else {
+        // 데이터가 아예 없는 경우에만 MOCK 데이터 초기화
         setPools(MOCK_POOLS);
         for (const p of MOCK_POOLS) await savePool(p);
       }
     } catch (e) {
       console.error("Data load failed:", e);
+      setPools(MOCK_POOLS);
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +94,6 @@ function App() {
   };
 
   const handleNearMe = () => {
-    // 토글 기능: 이미 내 주변이 선택되어 있다면 해제
     if (selectedRegion === "내주변") {
       setSelectedRegion("전체");
       setUserLocation(null);
@@ -137,6 +139,7 @@ function App() {
       isAvailable: isPoolAvailable(p, targetDateObj, isTodaySelected)
     }));
 
+    // 공개/비공개 필터
     if (view === 'private') {
       list = list.filter(p => p.isPublic === false);
     } else {
@@ -144,6 +147,7 @@ function App() {
     }
 
     if (view !== 'private') {
+      // 지역 필터
       if (selectedRegion === "내주변" && userLocation) {
         list = list.filter(p => p.distance !== undefined && p.distance <= 5);
         list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
@@ -151,13 +155,13 @@ function App() {
         list = list.filter(p => p.region === selectedRegion);
       }
 
-      list = list.filter(p => isPoolAvailable(p, targetDateObj, false));
-
-      if (isTodaySelected && showAvailableOnly) {
+      // [중요!] 오늘가능 필터가 켜져 있을 때만 가용성 체크
+      if (showAvailableOnly) {
         list = list.filter(p => p.isAvailable);
       }
     }
 
+    // 검색어 필터
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
@@ -168,17 +172,23 @@ function App() {
 
   const handleUpdatePoolData = async (updatedPool: Pool) => {
     setIsLoading(true);
-    const success = await savePool(updatedPool);
-    if (success) {
-      const stored = await getStoredPools();
-      setPools(stored);
-      const freshMatch = stored.find(p => p.id === updatedPool.id);
-      if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
-      showToast("정보가 저장되었습니다.");
-    } else {
-      alert("데이터 저장 중 오류가 발생했습니다.");
+    try {
+      const success = await savePool(updatedPool);
+      if (success) {
+        const freshList = await getStoredPools();
+        setPools(freshList);
+        const freshMatch = freshList.find(p => p.id === updatedPool.id);
+        if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
+        showToast("정보가 성공적으로 반영되었습니다.");
+      } else {
+        alert("정보 저장에 실패했습니다. 네트워크 상태를 확인해 주세요.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("데이터 처리 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   if (view === 'form') {
@@ -203,7 +213,7 @@ function App() {
       {isLoading && (
         <div className="fixed inset-0 z-[100] bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center">
           <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
-          <p className="font-bold text-slate-600">처리 중...</p>
+          <p className="font-bold text-slate-600">수영장 정보를 동기화하고 있습니다...</p>
         </div>
       )}
 
