@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, Calendar, Star, Edit2, Sparkles, Waves, Thermometer, AlertCircle, Settings, History, Info, Baby, Footprints, Eye, EyeOff, RotateCcw, Loader2, Map as MapIcon, Phone, Clock, DollarSign, Globe, ChevronRight } from 'lucide-react';
-import { Pool, Review, FreeSwimSchedule } from '../types';
+import { X, MapPin, Calendar, Star, Edit2, Sparkles, Waves, Thermometer, AlertCircle, History, Info, Baby, Footprints, Map as MapIcon, Phone, Clock, DollarSign, Globe, ChevronRight } from 'lucide-react';
+import { Pool, Review } from '../types';
 import { generatePoolSummary } from '../services/geminiService';
 import VersionHistory from './VersionHistory';
 
@@ -80,7 +80,6 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
     onUpdatePool(updated);
   };
 
-  // 상세 페이지용 대체 이미지 UI
   const PlaceholderDetail = () => (
     <div className="w-full h-full bg-gradient-to-br from-brand-600 to-brand-800 flex flex-col items-center justify-center text-white">
       <div className="p-5 bg-white/10 rounded-3xl backdrop-blur-md border border-white/20 mb-6 scale-125">
@@ -154,7 +153,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
           
           {activeTab === 'info' && (
             <div className="space-y-12 pb-12">
-                {/* 1. 정기휴무 및 공휴일 */}
+                {/* 1. 휴무 안내 */}
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
                         <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2.5">
@@ -193,7 +192,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                     <Clock className="w-7 h-7 text-brand-500" /> 자유수영 시간표
                   </h3>
                   <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm space-y-4">
-                    {pool.freeSwimSchedule.length > 0 ? pool.freeSwimSchedule.map((sch, i) => (
+                    {pool.freeSwimSchedule && pool.freeSwimSchedule.length > 0 ? pool.freeSwimSchedule.map((sch, i) => (
                       <div key={i} className="bg-slate-50 p-6 rounded-2xl border border-slate-100/50 space-y-3">
                         <div className="flex justify-between items-center">
                            <span className="text-sm font-black text-brand-500 uppercase tracking-widest">{formatWeekInfo(sch.weeks)}</span>
@@ -214,7 +213,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                     <DollarSign className="w-7 h-7 text-emerald-500" /> 이용 요금
                   </h3>
                   <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm space-y-5">
-                    {pool.fees.length > 0 ? pool.fees.map((f, i) => (
+                    {pool.fees && pool.fees.length > 0 ? pool.fees.map((f, i) => (
                       <div key={i} className="flex items-center justify-between text-base">
                         <div className="flex items-center gap-4">
                             <span className={`text-sm px-3 py-1.5 rounded-xl font-black ${f.category === '평일' ? 'bg-slate-100 text-slate-500' : 'bg-red-50 text-red-500'}`}>{f.category}</span>
@@ -271,40 +270,47 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                   </div>
                 )}
 
-                {/* 6. 문의처 및 홈페이지 */}
+                {/* 6. 문의처 */}
                 <div className="space-y-6">
                   <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2.5">
                     <Phone className="w-7 h-7 text-slate-600" /> 문의처
                   </h3>
-                  <div className="flex flex-col gap-4">
-                    <div className="bg-slate-900 p-8 rounded-[32px] shadow-xl flex items-center justify-between group overflow-hidden relative">
-                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Phone className="w-32 h-32 text-white" /></div>
-                      <div className="relative z-10">
-                        <span className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1 block">전화번호</span>
-                        <span className="text-2xl font-black text-white tracking-wider">{pool.phone || '번호 정보 없음'}</span>
-                      </div>
-                      <a href={`tel:${pool.phone}`} className="relative z-10 p-4 bg-brand-600 rounded-2xl text-white hover:bg-brand-500 transition-colors shadow-lg active:scale-90">
-                        <Phone className="w-6 h-6" />
-                      </a>
+                  
+                  {/* 통합 문의 카드 */}
+                  <div className="bg-slate-900 p-8 rounded-[32px] shadow-xl flex items-center justify-between group overflow-hidden relative">
+                    {/* 배경 아이콘 패턴 */}
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+                      <Phone className="w-32 h-32 text-white" />
                     </div>
-
-                    {pool.homepageUrl && (
-                      <button 
-                        onClick={openHomepage}
-                        className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between group hover:bg-slate-50 transition-all active:scale-[0.98]"
+                    
+                    {/* 정보 영역 */}
+                    <div className="relative z-10">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5 block">전화번호</span>
+                      <span className="text-2xl font-black text-white tracking-wider">{pool.phone || '번호 없음'}</span>
+                    </div>
+                    
+                    {/* 액션 버튼 영역 */}
+                    <div className="relative z-10 flex gap-3">
+                      {/* 전화 걸기 버튼 */}
+                      <a 
+                        href={`tel:${pool.phone}`} 
+                        className="p-5 bg-brand-600 rounded-[22px] text-white hover:bg-brand-500 transition-all shadow-lg active:scale-90 flex items-center justify-center border border-white/10"
+                        title="전화 걸기"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-brand-100 rounded-2xl flex items-center justify-center text-brand-600">
-                            <Globe className="w-7 h-7" />
-                          </div>
-                          <div className="text-left">
-                            <span className="text-sm font-black text-slate-400 uppercase tracking-widest block">공식 홈페이지</span>
-                            <span className="text-xl font-black text-slate-800 truncate max-w-[200px] sm:max-w-xs">{pool.homepageUrl}</span>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-6 h-6 text-slate-300 group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    )}
+                        <Phone className="w-7 h-7" />
+                      </a>
+                      
+                      {/* 홈페이지 버튼 (등록된 경우에만 노출) */}
+                      {pool.homepageUrl && (
+                        <button 
+                          onClick={openHomepage}
+                          className="p-5 bg-white/10 backdrop-blur-md rounded-[22px] text-white hover:bg-white/20 transition-all shadow-lg active:scale-90 flex items-center justify-center border border-white/20"
+                          title="홈페이지 방문"
+                        >
+                          <Globe className="w-7 h-7" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -348,7 +354,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                 </div>
 
                 <div className="space-y-6">
-                  {pool.reviews.map(r => (
+                  {pool.reviews && pool.reviews.map(r => (
                     <div key={r.id} className="bg-white p-7 rounded-[32px] border border-slate-100 shadow-sm">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3">
@@ -413,7 +419,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                 <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest">수영장 노출 설정</h4>
                 <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[24px] border border-slate-100">
                   <div className="flex items-center gap-4">
-                    {pool.isPublic !== false ? <Eye className="w-6 h-6 text-emerald-500" /> : <EyeOff className="w-6 h-6 text-red-500" />}
+                    {pool.isPublic !== false ? <Waves className="w-6 h-6 text-emerald-500" /> : <Waves className="w-6 h-6 text-red-500 opacity-50" />}
                     <div>
                       <div className="text-base font-black text-slate-800">{pool.isPublic !== false ? '현재 공개 중' : '현재 비공개 중'}</div>
                       <div className="text-xs text-slate-500 font-bold">비공개 시 목록에서 즉시 제외됩니다.</div>

@@ -9,16 +9,21 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
   const [mapFilter, setMapFilter] = useState<'all' | 'available' | 'unavailable'>('all');
+  
+  // 사용자가 직접 시점을 변경했는지 여부와 지역 변경을 감지하기 위한 레프
+  const lastRegionRef = useRef<string>(selectedRegion);
+  const isInitialLoadRef = useRef<boolean>(true);
 
   // 지도 초기화
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
+    // 기본 시점: 서울 시청 (사용자 위치 없을 시)
     const initialCenter: L.LatLngExpression = userLocation ? [userLocation.lat, userLocation.lng] : [37.5665, 126.9780];
 
     mapInstanceRef.current = L.map(mapRef.current, {
       center: initialCenter,
-      zoom: userLocation ? 14 : 11,
+      zoom: userLocation ? 12 : 11, // 초기 줌 레벨 조정 (12 정도가 10km 내외 커버)
       zoomControl: false,
       attributionControl: false
     });
@@ -36,12 +41,13 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
     }, 100);
   }, []);
 
-  // 데이터 변경 시 마커 및 시점 업데이트
+  // 데이터 변경 시 마커 업데이트 및 시점 "선택적" 업데이트
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markerGroup = markersRef.current;
     if (!map || !markerGroup) return;
 
+    // 1. 마커 업데이트 (시점 이동 없이 마커만 다시 그림)
     markerGroup.clearLayers();
     const bounds = L.latLngBounds([]);
 
@@ -56,7 +62,9 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
         zIndexOffset: 2000
       }).addTo(markerGroup);
       
-      if (selectedRegion === "내주변") bounds.extend([userLocation.lat, userLocation.lng]);
+      if (selectedRegion === "내주변" || isInitialLoadRef.current) {
+        bounds.extend([userLocation.lat, userLocation.lng]);
+      }
     }
 
     pools.forEach(pool => {
@@ -82,17 +90,29 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
       bounds.extend([pool.lat, pool.lng]);
     });
 
-    if (userLocation && selectedRegion === "내주변") {
-      map.flyTo([userLocation.lat, userLocation.lng], 14, { duration: 1.5 });
-    } else if (bounds.isValid() && pools.length > 0) {
-      // 모든 마커가 보이도록 패딩을 주고 줌을 맞춤
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+    // 2. 시점 자동 이동 조건 체크
+    // - 최초 로드 시
+    // - selectedRegion이 변경되었을 때 (사용자가 필터를 명시적으로 바꾼 경우)
+    const hasRegionChanged = lastRegionRef.current !== selectedRegion;
+    
+    if (isInitialLoadRef.current || hasRegionChanged) {
+      if (userLocation && (selectedRegion === "내주변" || isInitialLoadRef.current)) {
+        // 내 주변 10km 반경이 잘 보이도록 줌 레벨 12로 이동
+        map.flyTo([userLocation.lat, userLocation.lng], 12, { duration: 1.5 });
+      } else if (bounds.isValid() && pools.length > 0) {
+        // 전체 보기나 특정 지역 선택 시 마커들에 맞춤
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+      }
+      
+      isInitialLoadRef.current = false;
+      lastRegionRef.current = selectedRegion;
     }
   }, [pools, userLocation, selectedRegion, mapFilter]);
 
   const handleRecenter = () => {
     if (userLocation && mapInstanceRef.current) {
-      mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 15, { duration: 1 });
+      // 내 위치로 다시 갈 때 10km 반경인 12~13 줌으로 이동
+      mapInstanceRef.current.flyTo([userLocation.lat, userLocation.lng], 13, { duration: 1 });
     } else {
       onRequestLocation();
     }
