@@ -81,10 +81,14 @@
         background: transparent !important;
         border: none !important;
       }
-      /* Leaflet 기본 스타일 보정 */
       .leaflet-container {
         font-family: inherit;
         background-color: #f8fafc;
+        z-index: 10 !important; /* 지도가 모달보다 아래에 있도록 설정 */
+      }
+      /* 모달이 지도 위로 확실히 뜨게 강제 */
+      .fixed.inset-0.z-50 {
+        z-index: 9999 !important;
       }
     </style>
     <script type="importmap">
