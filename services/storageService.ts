@@ -54,6 +54,7 @@ export const getStoredPools = async (): Promise<Pool[]> => {
           address: item.address,
           region: item.region,
           phone: item.phone,
+          homepageUrl: item.homepage_url, // 추가된 부분
           imageUrl: item.image_url,
           lat: item.lat,
           lng: item.lng,
@@ -110,6 +111,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       address: pool.address,
       region: pool.region,
       phone: pool.phone,
+      homepage_url: pool.homepageUrl, // 추가된 부분
       image_url: pool.imageUrl,
       lat: pool.lat,
       lng: pool.lng,
@@ -119,6 +121,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       has_heated_pool: pool.hasHeatedPool,
       has_walking_lane: pool.hasWalkingLane,
       extra_features: pool.extraFeatures,
+      // Fix: Corrected property name from free_swim_schedule to freeSwimSchedule
       free_swim_schedule: pool.freeSwimSchedule,
       fees: pool.fees,
       closed_days: pool.closedDays,
