@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { MapPin, Clock, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin, Star, Waves, ListFilter } from 'lucide-react';
 import { Pool } from '../types';
 
 interface PoolCardProps {
@@ -10,22 +10,44 @@ interface PoolCardProps {
 }
 
 const PoolCard: React.FC<PoolCardProps> = ({ pool, onClick, distance }) => {
-  const adultFee = pool.fees.find(f => f.type === 'adult')?.price;
+  const [imgError, setImgError] = useState(false);
+  
+  const adultFeeObj = pool.fees.find(f => f.type === 'adult');
+  const adultFee = adultFeeObj?.price;
+  const totalFeeCount = pool.fees.length;
+  
   const avgRating = pool.reviews.length > 0 
     ? (pool.reviews.reduce((acc, r) => acc + r.rating, 0) / pool.reviews.length).toFixed(1)
     : null;
+
+  const scheduleCount = pool.freeSwimSchedule.length;
+
+  const PlaceholderImage = () => (
+    <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex flex-col items-center justify-center text-white p-6">
+      <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-sm border border-white/30">
+        <Waves size={32} strokeWidth={2.5} />
+      </div>
+      <span className="text-2xl font-black tracking-tight opacity-90">자유수영.kr</span>
+      <span className="text-[10px] font-bold mt-2 opacity-50 uppercase tracking-[0.2em]">Ready for Swimming</span>
+    </div>
+  );
 
   return (
     <div 
       onClick={() => onClick(pool)}
       className="bg-white rounded-3xl sm:rounded-[40px] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer overflow-hidden group"
     >
-      <div className="relative h-48 sm:h-64 overflow-hidden">
-        <img 
-          src={pool.imageUrl} 
-          alt={pool.name} 
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
-        />
+      <div className="relative h-48 sm:h-64 overflow-hidden bg-slate-100">
+        {(!pool.imageUrl || imgError) ? (
+          <PlaceholderImage />
+        ) : (
+          <img 
+            src={pool.imageUrl} 
+            alt={pool.name} 
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
+          />
+        )}
         <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex flex-col gap-3">
           <div className={`px-4 py-1.5 sm:px-5 sm:py-2 rounded-full text-xs sm:text-sm font-black text-white shadow-xl backdrop-blur-md border border-white/20 ${pool.isAvailable ? 'bg-emerald-500/90' : 'bg-slate-500/90'}`}>
             {pool.isAvailable ? '● 이용가능' : '○ 이용불가'}
@@ -39,7 +61,7 @@ const PoolCard: React.FC<PoolCardProps> = ({ pool, onClick, distance }) => {
       </div>
 
       <div className="p-6 sm:p-10">
-        <div className="flex justify-between items-start mb-3 sm:mb-4">
+        <div className="flex justify-between items-start mb-2 sm:mb-3">
           <h3 className="text-xl sm:text-3xl font-black text-slate-900 group-hover:text-brand-600 transition-colors leading-tight line-clamp-1">
             {pool.name}
           </h3>
@@ -50,25 +72,45 @@ const PoolCard: React.FC<PoolCardProps> = ({ pool, onClick, distance }) => {
           )}
         </div>
         
-        <p className="text-sm sm:text-lg text-slate-500 flex items-center gap-2 mb-6 sm:mb-8 font-bold">
+        <p className="text-sm sm:text-lg text-slate-500 flex items-center gap-2 mb-4 sm:mb-6 font-bold">
           <MapPin size={16} className="text-slate-300 shrink-0 sm:w-5 sm:h-5" /> 
           <span className="line-clamp-1">{pool.address}</span>
         </p>
 
-        <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-10">
+        {/* 시간표 섹션 */}
+        <div className="space-y-1.5 sm:space-y-2 mb-2 sm:mb-3">
           {pool.freeSwimSchedule.slice(0, 1).map((s, i) => (
             <div key={i} className="bg-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-5 flex justify-between items-center border border-slate-100/50">
               <span className="text-xs sm:text-base font-black text-slate-600">{s.day}</span>
-              <span className="text-sm sm:text-xl font-black text-brand-600">{s.startTime} - {s.endTime}</span>
+              <div className="flex flex-col items-end">
+                <span className="text-sm sm:text-xl font-black text-brand-600">{s.startTime} - {s.endTime}</span>
+              </div>
             </div>
           ))}
+          {scheduleCount > 1 && (
+            <div className="flex justify-end pr-1">
+              <span className="text-[10px] sm:text-xs font-black text-slate-400 flex items-center gap-1 bg-slate-50/80 px-2 py-0.5 rounded-lg">
+                <ListFilter size={12} className="text-brand-500" /> 외 {scheduleCount - 1}개 시간표 더보기
+              </span>
+            </div>
+          )}
         </div>
 
-        <div className="pt-6 sm:pt-8 border-t border-slate-50 flex justify-between items-center">
-          <span className="text-[10px] sm:text-sm font-black text-slate-300 uppercase tracking-widest sm:tracking-[0.2em]">Adult Fee</span>
-          <span className="text-xl sm:text-3xl font-black text-slate-900">
-            {adultFee ? `${adultFee.toLocaleString()}원` : '정보없음'}
-          </span>
+        {/* 요금 섹션 - 줄간격을 좁히기 위해 pt-2로 조정 */}
+        <div className="pt-2 sm:pt-3 border-t border-slate-50">
+          <div className="flex items-center justify-between bg-slate-50 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-slate-100/50">
+            <span className="text-xs sm:text-base font-black text-slate-600">이용 요금</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm sm:text-xl font-black text-slate-900">
+                {adultFee !== undefined ? `성인 ${adultFee.toLocaleString()}원` : '정보없음'}
+              </span>
+              {totalFeeCount > 1 && (
+                <span className="text-[10px] sm:text-xs font-bold text-slate-400">
+                  외 {totalFeeCount - 1}개
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

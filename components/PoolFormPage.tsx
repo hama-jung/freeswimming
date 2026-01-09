@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, MapPin, Clock, DollarSign, ArrowLeft, Loader2, Search, CheckCircle2, ChevronDown, Map as MapIcon, Info, PlusCircle, RotateCcw, Trash2, Calendar, Waves, Thermometer, AlertCircle, ImageIcon } from 'lucide-react';
+import { Save, MapPin, Clock, DollarSign, ArrowLeft, Loader2, Search, CheckCircle2, ChevronDown, Map as MapIcon, Info, PlusCircle, RotateCcw, Trash2, Calendar, Waves, Thermometer, AlertCircle, ImageIcon, Globe } from 'lucide-react';
 import { Pool, FreeSwimSchedule, FeeInfo, Region, HolidayRule } from '../types';
 import { REGIONS } from '../constants';
 import { searchLocationWithGemini, getCoordinatesFromAddress, MapSearchResult } from '../services/geminiService';
@@ -12,8 +12,6 @@ interface PoolFormPageProps {
 }
 
 const DEFAULT_POOL_IMAGE = "https://images.unsplash.com/photo-1519315530759-39149795460a?auto=format&fit=crop&q=80&w=800";
-const DRAFT_STORAGE_KEY = 'pool_form_draft_final';
-
 const WEEK_DAYS = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
 const DAY_SHORT_NAMES = ["월", "화", "수", "목", "금", "토", "일"];
 const WEEK_NUMBER_OPTIONS = [
@@ -38,20 +36,18 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
   const isEditMode = !!initialData;
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // 장소 검색 관련 상태
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MapSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedCoords, setSelectedCoords] = useState<{lat: number, lng: number} | null>(initialData ? {lat: initialData.lat, lng: initialData.lng} : null);
 
-  // 기본 정보 상태
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [region, setRegion] = useState<Region>('서울');
   const [phone, setPhone] = useState('');
+  const [homepageUrl, setHomepageUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   
-  // 시설 정보 상태
   const [lanes, setLanes] = useState(6);
   const [length, setLength] = useState(25);
   const [hasKidsPool, setHasKidsPool] = useState(false);
@@ -59,13 +55,11 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
   const [hasWalkingLane, setHasWalkingLane] = useState(false);
   const [extraFeatures, setExtraFeatures] = useState('');
 
-  // 휴무일 설정 상태
   const [regularHolidayEnabled, setRegularHolidayEnabled] = useState(true);
   const [publicHolidayEnabled, setPublicHolidayEnabled] = useState(true);
   const [temporaryHolidayEnabled, setTemporaryHolidayEnabled] = useState(false);
   const [holidayRules, setHolidayRules] = useState<HolidayRule[]>([{ type: 'WEEKLY', weekNumber: 0, dayOfWeek: 1 }]);
 
-  // 시간 및 요금 상태
   const [schedules, setSchedules] = useState<FreeSwimSchedule[]>([]);
   const [fees, setFees] = useState<FeeInfo[]>([]);
 
@@ -73,17 +67,17 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     if (initialData) {
       applyData(initialData);
     } else {
-      // 요일 기본값 없음 (빈 문자열), 주차 기본값 매주 (0)
       setSchedules([{ day: '', startTime: '09:00', endTime: '18:00', weeks: [0] }]);
       setFees([{ type: 'adult', category: '전체', price: 5000 }]);
     }
   }, [initialData]);
 
-  const applyData = (data: any) => {
+  const applyData = (data: Pool) => {
     setName(data.name || '');
     setAddress(data.address || '');
     setRegion(data.region as Region || '서울');
     setPhone(data.phone || '');
+    setHomepageUrl(data.homepageUrl || '');
     setImageUrl(data.imageUrl || '');
     setLanes(data.lanes || 6);
     setLength(data.length || 25);
@@ -91,9 +85,18 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     setHasHeatedPool(data.hasHeatedPool || false);
     setHasWalkingLane(data.hasWalkingLane || false);
     setExtraFeatures(data.extraFeatures || '');
-    setSchedules(data.freeSwimSchedule || data.schedules || []);
+    
+    // 요일 데이터 전처리: "평일(월-금)" 등을 실제 요일 배열로 변환하여 보존
+    const processedSchedules = (data.freeSwimSchedule || []).map(s => {
+      let dayStr = s.day;
+      if (dayStr === "평일(월-금)") dayStr = "월, 화, 수, 목, 금";
+      if (dayStr === "주말/공휴일") dayStr = "토, 일";
+      return { ...s, day: dayStr };
+    });
+    setSchedules(processedSchedules);
+    
     setFees(data.fees || []);
-    setSelectedCoords(data.selectedCoords || (data.lat ? {lat: data.lat, lng: data.lng} : null));
+    setSelectedCoords(data.lat ? {lat: data.lat, lng: data.lng} : null);
 
     if (data.holidayOptions) {
       setRegularHolidayEnabled(data.holidayOptions.regularHolidayEnabled);
@@ -161,7 +164,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       return;
     }
 
-    // 요일이 하나도 선택되지 않은 스케줄 체크
     const invalidSchedule = schedules.find(s => !s.day.trim());
     if (invalidSchedule) {
       alert("자유수영 시간표의 모든 항목에 대해 최소 하나 이상의 요일을 선택해 주세요.");
@@ -177,7 +179,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     
     const pool: Pool = {
       id: initialData ? initialData.id : `user-pool-${Date.now()}`,
-      name, address, region, phone,
+      name, address, region, phone, homepageUrl,
       imageUrl: imageUrl.trim() || DEFAULT_POOL_IMAGE,
       lat: selectedCoords.lat, lng: selectedCoords.lng,
       lanes, length, hasKidsPool, hasHeatedPool, hasWalkingLane, extraFeatures,
@@ -197,20 +199,12 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     onSave(pool);
   };
 
-  // 새 스케줄 추가 시 요일은 빈 값, 주차는 매주(0) 기본값
   const addSchedule = () => setSchedules([...schedules, { day: '', startTime: '09:00', endTime: '18:00', weeks: [0] }]);
   const removeSchedule = (idx: number) => setSchedules(schedules.filter((_, i) => i !== idx));
   
   const toggleDayInSchedule = (idx: number, dayName: string) => {
     const next = [...schedules];
     let currentDays = next[idx].day.split(', ').filter(d => d.trim() !== "");
-    
-    // 호환성 처리: 기존 데이터가 "평일(월-금)" 등일 경우 개별 요일로 전환
-    if (currentDays.length === 1 && (currentDays[0].includes("평일") || currentDays[0].includes("주말"))) {
-        if (currentDays[0] === "평일(월-금)") currentDays = ["월", "화", "수", "목", "금"];
-        else if (currentDays[0] === "주말/공휴일") currentDays = ["토", "일"];
-        else if (currentDays[0].endsWith("요일")) currentDays = [currentDays[0][0]];
-    }
 
     if (currentDays.includes(dayName)) {
       currentDays = currentDays.filter(d => d !== dayName);
@@ -228,15 +222,11 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     let currentWeeks = next[idx].weeks || [0];
     
     if (weekNum === 0) {
-      // '매주'를 누르면 다른 모든 주차 해제
       currentWeeks = [0];
     } else {
-      // 특정 주차를 누르면 '매주' 해제
       if (currentWeeks.includes(0)) currentWeeks = [];
-      
       if (currentWeeks.includes(weekNum)) {
         currentWeeks = currentWeeks.filter(w => w !== weekNum);
-        // 아무것도 선택되지 않으면 다시 '매주'로 복구
         if (currentWeeks.length === 0) currentWeeks = [0];
       } else {
         currentWeeks.push(weekNum);
@@ -279,7 +269,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
         </div>
       )}
 
-      {/* 고정된 서브 헤더: top-16 sm:top-20으로 메인 헤더 아래에 고정 */}
       <div className="bg-white/95 backdrop-blur-md border-b border-slate-200 py-4 px-4 sticky top-16 sm:top-20 z-40 shadow-sm transition-all">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <button type="button" onClick={onCancel} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors">
@@ -343,7 +332,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                 )}
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">지역 분류</label>
                     <select value={region} onChange={e => setRegion(e.target.value as Region)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold">
@@ -354,6 +343,13 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                     <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">문의 전화</label>
                     <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" placeholder="02-123-4567" />
                 </div>
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">공식 홈페이지</label>
+                    <div className="relative">
+                        <input type="url" value={homepageUrl} onChange={e => setHomepageUrl(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" placeholder="https://www.example.com" />
+                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                    </div>
+                </div>
             </div>
           </div>
 
@@ -362,9 +358,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                 <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                     <Clock className="w-6 h-6 text-brand-500" /> 자유수영 시간표
                 </h3>
-                <button type="button" onClick={addSchedule} className="flex items-center gap-1.5 bg-brand-50 text-brand-600 px-4 py-2 rounded-xl text-sm font-bold">
-                    <PlusCircle className="w-4 h-4" /> 추가
-                </button>
             </div>
             <div className="space-y-8">
                 {schedules.map((sch, idx) => (
@@ -402,7 +395,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">2. 운영 요일 선택 (필수)</label>
                            <div className="flex flex-wrap gap-2">
                               {DAY_SHORT_NAMES.map(dayName => {
-                                const isActive = sch.day.includes(dayName);
+                                const isActive = sch.day.split(', ').includes(dayName);
                                 return (
                                   <button
                                     key={dayName}
@@ -437,6 +430,9 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
                     </div>
                 ))}
             </div>
+            <button type="button" onClick={addSchedule} className="w-full flex items-center justify-center gap-2 bg-brand-50 text-brand-600 py-4 rounded-3xl text-base font-black border-2 border-dashed border-brand-100 hover:bg-brand-100 transition-all">
+                <PlusCircle className="w-5 h-5" /> 시간표 항목 추가하기
+            </button>
           </div>
 
           <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, MapPin, Calendar, Star, Edit2, Sparkles, Waves, Thermometer, AlertCircle, Settings, History, Info, Baby, Footprints, Eye, EyeOff, RotateCcw, Loader2, Map as MapIcon, Phone, Clock, DollarSign } from 'lucide-react';
+import { X, MapPin, Calendar, Star, Edit2, Sparkles, Waves, Thermometer, AlertCircle, Settings, History, Info, Baby, Footprints, Eye, EyeOff, RotateCcw, Loader2, Map as MapIcon, Phone, Clock, DollarSign, Globe, ChevronRight } from 'lucide-react';
 import { Pool, Review, FreeSwimSchedule } from '../types';
 import { generatePoolSummary } from '../services/geminiService';
 import VersionHistory from './VersionHistory';
@@ -23,10 +23,12 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
   const [aiSummary, setAiSummary] = useState<string>("");
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     setAiSummary("");
     setActiveTab('info');
+    setImgError(false);
   }, [pool.id]);
 
   const handleAddReview = () => {
@@ -57,6 +59,12 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
     window.open(url, '_blank');
   };
 
+  const openHomepage = () => {
+    if (pool.homepageUrl) {
+      window.open(pool.homepageUrl, '_blank');
+    }
+  };
+
   const formatWeekInfo = (weeks?: number[]) => {
     if (!weeks || weeks.includes(0)) return "매주";
     return weeks.map(w => `${w}주`).join(', ') + '차';
@@ -72,13 +80,33 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
     onUpdatePool(updated);
   };
 
+  // 상세 페이지용 대체 이미지 UI
+  const PlaceholderDetail = () => (
+    <div className="w-full h-full bg-gradient-to-br from-brand-600 to-brand-800 flex flex-col items-center justify-center text-white">
+      <div className="p-5 bg-white/10 rounded-3xl backdrop-blur-md border border-white/20 mb-6 scale-125">
+        <Waves size={48} strokeWidth={2.5} />
+      </div>
+      <h2 className="text-4xl font-black tracking-tight mb-2">자유수영.kr</h2>
+      <p className="text-white/40 font-bold uppercase tracking-[0.3em] text-xs">Premium Swimming Database</p>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col relative animate-in slide-in-from-bottom-4 duration-300">
         
         {/* Header Image */}
-        <div className="relative h-64 sm:h-80 shrink-0">
-          <img src={pool.imageUrl || 'https://images.unsplash.com/photo-1519315530759-39149795460a?auto=format&fit=crop&q=80&w=800'} alt={pool.name} className="w-full h-full object-cover" />
+        <div className="relative h-64 sm:h-80 shrink-0 bg-slate-200">
+          {(!pool.imageUrl || imgError) ? (
+            <PlaceholderDetail />
+          ) : (
+            <img 
+              src={pool.imageUrl} 
+              alt={pool.name} 
+              onError={() => setImgError(true)}
+              className="w-full h-full object-cover" 
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
           <button onClick={onClose} className="absolute top-6 right-6 bg-white/20 hover:bg-white/40 text-white p-2.5 rounded-full transition-colors"><X className="w-7 h-7" /></button>
           
@@ -87,11 +115,11 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
             <div className="flex items-center gap-3 text-lg text-white/90">
                 <div className="flex items-center gap-1.5 font-bold">
                   <MapPin className="w-5 h-5 text-brand-400" />
-                  <span>{pool.address}</span>
+                  <span className="line-clamp-1">{pool.address}</span>
                 </div>
                 <button 
                   onClick={openInGoogleMaps} 
-                  className="bg-white/20 hover:bg-white/40 p-2 rounded-xl backdrop-blur-md transition-all flex items-center gap-2 text-sm font-black border border-white/20 shadow-lg group active:scale-90"
+                  className="bg-white/20 hover:bg-white/40 p-2 rounded-xl backdrop-blur-md transition-all flex items-center gap-2 text-sm font-black border border-white/20 shadow-lg group active:scale-90 shrink-0"
                 >
                   <MapIcon className="w-4 h-4" />
                   <span className="hidden sm:inline">지도보기</span>
@@ -243,24 +271,43 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
                   </div>
                 )}
 
-                {/* 6. 문의사항 */}
+                {/* 6. 문의처 및 홈페이지 */}
                 <div className="space-y-6">
                   <h3 className="text-2xl font-black text-slate-800 flex items-center gap-2.5">
                     <Phone className="w-7 h-7 text-slate-600" /> 문의처
                   </h3>
-                  <div className="bg-slate-900 p-8 rounded-[32px] shadow-xl flex items-center justify-between group overflow-hidden relative">
-                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Phone className="w-32 h-32 text-white" /></div>
-                    <div className="relative z-10">
-                      <span className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1 block">궁금한 점은 여기로 전화주세요</span>
-                      <span className="text-2xl font-black text-white tracking-wider">{pool.phone || '번호 정보 없음'}</span>
+                  <div className="flex flex-col gap-4">
+                    <div className="bg-slate-900 p-8 rounded-[32px] shadow-xl flex items-center justify-between group overflow-hidden relative">
+                      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform"><Phone className="w-32 h-32 text-white" /></div>
+                      <div className="relative z-10">
+                        <span className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1 block">전화번호</span>
+                        <span className="text-2xl font-black text-white tracking-wider">{pool.phone || '번호 정보 없음'}</span>
+                      </div>
+                      <a href={`tel:${pool.phone}`} className="relative z-10 p-4 bg-brand-600 rounded-2xl text-white hover:bg-brand-500 transition-colors shadow-lg active:scale-90">
+                        <Phone className="w-6 h-6" />
+                      </a>
                     </div>
-                    <a href={`tel:${pool.phone}`} className="relative z-10 p-4 bg-brand-600 rounded-2xl text-white hover:bg-brand-500 transition-colors shadow-lg active:scale-90">
-                      <Phone className="w-6 h-6" />
-                    </a>
+
+                    {pool.homepageUrl && (
+                      <button 
+                        onClick={openHomepage}
+                        className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm flex items-center justify-between group hover:bg-slate-50 transition-all active:scale-[0.98]"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-brand-100 rounded-2xl flex items-center justify-center text-brand-600">
+                            <Globe className="w-7 h-7" />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-sm font-black text-slate-400 uppercase tracking-widest block">공식 홈페이지</span>
+                            <span className="text-xl font-black text-slate-800 truncate max-w-[200px] sm:max-w-xs">{pool.homepageUrl}</span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-6 h-6 text-slate-300 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* 변경 이력 버튼 */}
                 <div className="flex justify-center pt-8">
                   <button 
                     onClick={() => setIsHistoryModalOpen(true)}
@@ -351,7 +398,6 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
         </div>
       </div>
 
-      {/* 변경이력 모달 */}
       {isHistoryModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in duration-200">
@@ -362,7 +408,7 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
               <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 focus:outline-none"><X className="w-7 h-7" /></button>
             </div>
             
-            <div className="p-8 space-y-10 max-h-[70vh] overflow-y-auto">
+            <div className="p-8 space-y-10 max-h-[70vh] overflow-y-auto no-scrollbar">
               <div className="space-y-5">
                 <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest">수영장 노출 설정</h4>
                 <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[24px] border border-slate-100">

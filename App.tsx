@@ -9,11 +9,19 @@ import PoolFormPage from './components/PoolFormPage';
 import KoreaMap from './components/KoreaMap';
 import { getStoredPools, savePool, deletePool } from './services/storageService';
 
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+/**
+ * 하버사인 공식(Haversine Formula)을 이용한 두 좌표 간의 직선 거리 계산 (단위: km)
+ */
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (typeof lat1 !== 'number' || typeof lon1 !== 'number' || typeof lat2 !== 'number' || typeof lon2 !== 'number') return 9999;
   const R = 6371;
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -22,37 +30,30 @@ function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = 
   const dayIndex = targetDate.getDay(); 
   const dayOfMonth = targetDate.getDate();
   const weekOfMonth = Math.ceil(dayOfMonth / 7);
-  const currentMinutes = targetDate.getHours() * 60 + targetDate.getMinutes();
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
   const todayName = dayNames[dayIndex];
-  
   const closed = pool.closedDays || "";
   if (closed.includes(`매주 ${todayName}요일`)) return false;
-  
   const schedules = pool.freeSwimSchedule || [];
   const possibleSchedules = schedules.filter(s => {
     const scheduleWeeks = s.weeks || [0];
     const isCorrectWeek = scheduleWeeks.includes(0) || scheduleWeeks.includes(weekOfMonth);
     if (!isCorrectWeek) return false;
-    if (s.day.includes(todayName)) return true;
-    if (todayName === "일" && (s.day === "일요일" || s.day === "주말/공휴일")) return true;
-    if (todayName === "토" && (s.day === "토요일" || s.day === "주말/공휴일")) return true;
-    if (dayIndex >= 1 && dayIndex <= 5) {
-      if (s.day === "평일(월-금)") return true;
-      if (s.day === `${todayName}요일`) return true;
-    }
+    const dayStr = s.day.replace(/\s/g, '');
+    if (dayStr.includes(todayName)) return true;
+    if (todayName === "일" && (dayStr.includes("일요일") || dayStr.includes("주말"))) return true;
+    if (todayName === "토" && (dayStr.includes("토요일") || dayStr.includes("주말"))) return true;
+    if (dayIndex >= 1 && dayIndex <= 5 && dayStr.includes("평일")) return true;
     return false;
   });
-
   if (possibleSchedules.length === 0) return false;
-
   if (checkRealtime) {
     return possibleSchedules.some(s => {
+      if (!s.startTime) return false;
       const [startH, startM] = s.startTime.split(':').map(Number);
-      const [endH, endM] = s.endTime.split(':').map(Number);
-      const startMin = startH * 60 + startM;
-      const endMin = endH * 60 + endM;
-      return currentMinutes >= startMin && currentMinutes < endMin;
+      return (startH * 60 + startM) >= currentMinutes;
     });
   }
   return true;
@@ -66,9 +67,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingPool, setEditingPool] = useState<Pool | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<{text: string, type: 'success'|'error', code?: string} | null>(null);
-  
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  
   const [selectedRegion, setSelectedRegion] = useState<Region | "내주변">("전체");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPoolDetail, setSelectedPoolDetail] = useState<Pool | null>(null);
@@ -78,11 +77,11 @@ function App() {
 
   useEffect(() => {
     loadData();
-    // 접속 시 위치 정보 미리 가져오기
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
+      const geoId = navigator.geolocation.watchPosition((pos) => {
         setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      }, () => {});
+      }, null, { enableHighAccuracy: true });
+      return () => navigator.geolocation.clearWatch(geoId);
     }
   }, []);
 
@@ -113,27 +112,22 @@ function App() {
         const freshMatch = freshList.find(p => p.id === updatedPool.id);
         if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
         showToast("정보가 저장되었습니다.");
-      } else {
-        showToast(result.error || "저장 오류", 'error');
       }
-    } catch (e: any) {
-      showToast(e.message, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNearMe = () => {
-    if (!navigator.geolocation) return alert("위치 정보를 지원하지 않습니다.");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setSelectedRegion("내주변");
-        setDisplayMode('map'); // 내주변 클릭 시 지도로 전환하여 직관성 제공
-        showToast("내 주변 5km 수영장을 찾았습니다.");
-      },
-      () => alert("위치 권한을 허용해주세요.")
-    );
+    if (selectedRegion === "내주변") {
+      setSelectedRegion("전체");
+      return;
+    }
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition((pos) => {
+      setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      setSelectedRegion("내주변");
+    });
   };
 
   const handleLogoClick = () => {
@@ -145,24 +139,21 @@ function App() {
 
   const processedPools = useMemo(() => {
     const targetDateObj = new Date(selectedDate);
-    const now = new Date();
-    if (isTodaySelected) targetDateObj.setHours(now.getHours(), now.getMinutes());
-    else targetDateObj.setHours(0, 0); 
-
     let list = pools.map(p => ({
       ...p,
       distance: userLocation ? calculateDistance(userLocation.lat, userLocation.lng, p.lat, p.lng) : undefined,
       isAvailable: isPoolAvailable(p, targetDateObj, isTodaySelected)
     }));
-
     list = list.filter(p => view === 'private' ? p.isPublic === false : p.isPublic !== false);
-
     if (view !== 'private') {
       if (selectedRegion === "내주변" && userLocation) {
-        list = list.filter(p => p.distance !== undefined && p.distance <= 5);
+        list = list.filter(p => p.distance !== undefined && p.distance <= 8);
         list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
       } else if (selectedRegion !== "전체" && selectedRegion !== "내주변") {
         list = list.filter(p => p.region === selectedRegion);
+        if (userLocation) list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+      } else if (userLocation) {
+        list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
       }
       if (showAvailableOnly) list = list.filter(p => p.isAvailable);
     }
@@ -200,7 +191,9 @@ function App() {
       <header className="bg-white border-b border-slate-100 z-50 sticky top-0 shrink-0">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
           <button className="flex items-center gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-lg"><Waves size={24} strokeWidth={3} /></div>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+              <Waves size={24} strokeWidth={2.5} />
+            </div>
             <h1 className="text-lg sm:text-2xl font-black text-slate-900">자유수영.kr</h1>
           </button>
           <div className="flex items-center gap-2">
@@ -230,7 +223,7 @@ function App() {
           <div className="bg-white border-b border-slate-100 z-40 sticky top-16 sm:top-20 shrink-0">
             <div className="max-w-[1280px] mx-auto">
               <div className="hidden sm:flex px-6 py-4 gap-4 items-center border-b border-slate-50">
-                <div className="relative flex-1 max-w-md">
+                <div className="relative flex-1 max-md">
                   <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="어느 수영장을 찾으세요?" className="w-full pl-12 pr-4 h-14 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all outline-none" />
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
                 </div>
@@ -249,7 +242,6 @@ function App() {
                 </div>
               </div>
 
-              {/* 모바일 3버튼 액션 바 */}
               <div className="flex sm:hidden px-4 py-3 justify-center items-center gap-4">
                 <button onClick={handleNearMe} className={`flex-1 flex flex-col items-center justify-center h-14 rounded-2xl transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
                   <LocateFixed size={20} />
@@ -267,53 +259,6 @@ function App() {
             </div>
           </div>
 
-          {/* 모바일 상세 필터 오버레이 */}
-          {isMobileFilterOpen && (
-            <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
-              <header className="h-16 flex items-center justify-between px-6 border-b border-slate-100">
-                <h2 className="text-xl font-black text-slate-900">상세 필터 및 검색</h2>
-                <button onClick={() => setIsMobileFilterOpen(false)} className="p-2 text-slate-400"><X size={28} /></button>
-              </header>
-              <div className="flex-1 overflow-y-auto p-6 space-y-10 pb-20">
-                <div className="space-y-4">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">보기 모드</label>
-                  <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl">
-                    <button onClick={() => { setDisplayMode('map'); setIsMobileFilterOpen(false); }} className={`flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all ${displayMode === 'map' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500'}`}><MapIcon size={18} /> 지도보기</button>
-                    <button onClick={() => { setDisplayMode('list'); setIsMobileFilterOpen(false); }} className={`flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm transition-all ${displayMode === 'list' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500'}`}><ListIcon size={18} /> 목록보기</button>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">수영장 검색</label>
-                  <div className="relative">
-                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="수영장 이름 또는 주소" className="w-full pl-12 pr-4 h-14 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-bold focus:ring-2 focus:ring-brand-500 outline-none" />
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">날짜 선택</label>
-                  <div className="relative">
-                    <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" />
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">지역 선택</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {REGIONS.map(r => (
-                      <button key={r} onClick={() => setSelectedRegion(r)} className={`py-3 rounded-xl text-xs font-black border-2 transition-all ${selectedRegion === r ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}>{r}</button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="p-6 bg-white border-t border-slate-100 sticky bottom-0">
-                <button onClick={() => setIsMobileFilterOpen(false)} className="w-full h-16 bg-brand-600 text-white rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">적용 및 닫기</button>
-              </div>
-            </div>
-          )}
-
           <main className={`flex-1 relative ${displayMode === 'map' ? 'overflow-hidden' : ''}`}>
             {displayMode === 'map' ? (
               <div className="absolute inset-0">
@@ -324,12 +269,6 @@ function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
                   {processedPools.map(p => <PoolCard key={p.id} pool={p} onClick={setSelectedPoolDetail} distance={p.distance} />)}
                 </div>
-                {processedPools.length === 0 && (
-                  <div className="py-20 text-center">
-                    <Info size={48} className="mx-auto text-slate-200 mb-4" />
-                    <p className="text-slate-400 font-bold">검색 결과가 없습니다.</p>
-                  </div>
-                )}
               </div>
             )}
           </main>

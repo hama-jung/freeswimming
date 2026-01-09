@@ -44,6 +44,7 @@ export interface Pool {
   address: string;
   region: string;
   phone: string;
+  homepageUrl?: string; // 홈페이지 주소 추가
   imageUrl: string;
   lat: number;
   lng: number;

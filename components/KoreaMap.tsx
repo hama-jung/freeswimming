@@ -14,7 +14,6 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
-    // 사용자 위치가 있으면 그곳을, 없으면 서울 시청 기준
     const initialCenter: L.LatLngExpression = userLocation ? [userLocation.lat, userLocation.lng] : [37.5665, 126.9780];
 
     mapInstanceRef.current = L.map(mapRef.current, {
@@ -46,7 +45,6 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
     markerGroup.clearLayers();
     const bounds = L.latLngBounds([]);
 
-    // 사용자 위치 마커
     if (userLocation) {
       const userIcon = L.divIcon({
         className: 'user-location-marker',
@@ -58,7 +56,6 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
         zIndexOffset: 2000
       }).addTo(markerGroup);
       
-      // 사용자 위치를 바운즈에 포함시킬지 여부는 selectedRegion에 따라 다름
       if (selectedRegion === "내주변") bounds.extend([userLocation.lat, userLocation.lng]);
     }
 
@@ -85,11 +82,11 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
       bounds.extend([pool.lat, pool.lng]);
     });
 
-    // 특정 지역 필터링 시 해당 지역으로 시점 이동
     if (userLocation && selectedRegion === "내주변") {
       map.flyTo([userLocation.lat, userLocation.lng], 14, { duration: 1.5 });
     } else if (bounds.isValid() && pools.length > 0) {
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+      // 모든 마커가 보이도록 패딩을 주고 줌을 맞춤
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
     }
   }, [pools, userLocation, selectedRegion, mapFilter]);
 
@@ -105,7 +102,6 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
     <div className="w-full h-full relative overflow-hidden bg-slate-50">
       <div ref={mapRef} className="w-full h-full" />
       
-      {/* 지도 필터 UI */}
       <div className="absolute top-4 left-4 z-[500] bg-white/95 backdrop-blur-xl p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xl border border-slate-200 flex flex-col gap-2 sm:gap-3 min-w-[140px] sm:min-w-[160px] animate-in slide-in-from-left duration-300">
         <div className="flex items-center gap-2 text-slate-800">
           <Layers className="w-4 h-4 text-brand-500" />
@@ -134,7 +130,6 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
         </div>
       </div>
 
-      {/* 내 위치 버튼 */}
       <button 
         onClick={handleRecenter}
         className="absolute bottom-12 right-4 sm:bottom-10 sm:right-6 z-[500] bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xl border border-slate-200 hover:bg-slate-50 active:scale-90 transition-all text-red-600 flex items-center justify-center"
@@ -142,7 +137,6 @@ const KoreaMap: React.FC<KoreaMapProps> = ({ pools, onSelectPool, userLocation, 
         <LocateFixed size={20} strokeWidth={2.5} />
       </button>
 
-      {/* 지도 가이드 라벨 */}
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-[500] pointer-events-none">
         <div className="bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-[9px] font-bold tracking-widest uppercase flex items-center gap-2 border border-white/10 shadow-2xl">
           <MapIcon size={12} className="text-brand-400" />
