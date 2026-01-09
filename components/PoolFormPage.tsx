@@ -86,7 +86,6 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     setHasWalkingLane(data.hasWalkingLane || false);
     setExtraFeatures(data.extraFeatures || '');
     
-    // 요일 데이터 전처리: "평일(월-금)" 등을 실제 요일 배열로 변환하여 보존
     const processedSchedules = (data.freeSwimSchedule || []).map(s => {
       let dayStr = s.day;
       if (dayStr === "평일(월-금)") dayStr = "월, 화, 수, 목, 금";
@@ -179,10 +178,20 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
     
     const pool: Pool = {
       id: initialData ? initialData.id : `user-pool-${Date.now()}`,
-      name, address, region, phone, homepageUrl,
+      name, 
+      address, 
+      region, 
+      phone, 
+      homepageUrl: homepageUrl.trim(), // 확실하게 필드 포함
       imageUrl: imageUrl.trim() || DEFAULT_POOL_IMAGE,
-      lat: selectedCoords.lat, lng: selectedCoords.lng,
-      lanes, length, hasKidsPool, hasHeatedPool, hasWalkingLane, extraFeatures,
+      lat: selectedCoords.lat, 
+      lng: selectedCoords.lng,
+      lanes, 
+      length, 
+      hasKidsPool, 
+      hasHeatedPool, 
+      hasWalkingLane, 
+      extraFeatures,
       freeSwimSchedule: schedules,
       fees,
       closedDays: regularHolidayEnabled ? rulesSummary : "연중무휴",
@@ -194,6 +203,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
         rules: holidayRules 
       },
       reviews: initialData?.reviews || [],
+      isPublic: initialData?.isPublic !== false
     };
 
     onSave(pool);
