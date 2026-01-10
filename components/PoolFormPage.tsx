@@ -176,12 +176,13 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
         .map(r => `${r.weekNumber === 0 ? '매주' : `매월 ${r.weekNumber}번째`} ${WEEK_DAYS[r.dayOfWeek]}`)
         .join(', ');
     
+    // 이 부분이 핵심입니다: homepageUrl 필드를 명시적으로 객체에 할당
     const pool: Pool = {
       id: initialData ? initialData.id : `user-pool-${Date.now()}`,
-      name, 
-      address, 
+      name: name.trim(), 
+      address: address.trim(), 
       region, 
-      phone, 
+      phone: phone.trim(), 
       homepageUrl: homepageUrl.trim(), // 확실하게 필드 포함
       imageUrl: imageUrl.trim() || DEFAULT_POOL_IMAGE,
       lat: selectedCoords.lat, 
@@ -191,7 +192,7 @@ const PoolFormPage: React.FC<PoolFormPageProps> = ({ onSave, onCancel, initialDa
       hasKidsPool, 
       hasHeatedPool, 
       hasWalkingLane, 
-      extraFeatures,
+      extraFeatures: extraFeatures.trim(),
       freeSwimSchedule: schedules,
       fees,
       closedDays: regularHolidayEnabled ? rulesSummary : "연중무휴",
