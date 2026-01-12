@@ -80,26 +80,27 @@ export const getStoredPools = async (): Promise<Pool[]> => {
 };
 
 export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string}> => {
-  // 로컬 선반영
-  const currentPools = await getStoredPools();
-  const index = currentPools.findIndex(p => p.id === pool.id);
-  let updatedPools = [...currentPools];
-  if (index >= 0) updatedPools[index] = pool;
-  else updatedPools = [pool, ...updatedPools];
-  saveToLocal(updatedPools);
+  // 로컬 저장소에 먼저 반영 (오프라인/즉각적인 UI 업데이트용)
+  try {
+    const currentPools = await getStoredPools();
+    const index = currentPools.findIndex(p => p.id === pool.id);
+    let updatedPools = [...currentPools];
+    if (index >= 0) updatedPools[index] = pool;
+    else updatedPools = [pool, ...updatedPools];
+    saveToLocal(updatedPools);
+  } catch (e) {}
 
   if (!supabase) {
-    return { success: false, error: "Supabase 연결 정보가 없습니다. 환경 변수를 확인해주세요." };
+    return { success: false, error: "Supabase 연결 정보가 없습니다." };
   }
 
   try {
-    const payload = {
+    const payload: any = {
       id: pool.id,
       name: pool.name,
       address: pool.address,
       region: pool.region,
       phone: pool.phone || "",
-      homepage_url: pool.homepageUrl || "",
       image_url: pool.imageUrl || "",
       lat: pool.lat,
       lng: pool.lng,
@@ -117,24 +118,32 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       is_public: pool.isPublic !== false
     };
 
-    const { error } = await supabase
+    // homepage_url 컬럼이 DB에 없을 수도 있으므로 안전하게 조건부 할당
+    if (pool.homepageUrl !== undefined) {
+      payload.homepage_url = pool.homepageUrl;
+    }
+
+    // 데이터 업서트
+    const { error: upsertError } = await supabase
       .from('pools')
       .upsert(payload, { onConflict: 'id' });
 
-    if (error) {
-      console.error("[Storage] Upsert Fail Detail:", error);
-      return { success: false, error: `${error.message} (코드: ${error.code})` };
+    if (upsertError) {
+      return { success: false, error: `${upsertError.message} (${upsertError.code})` };
     }
 
-    // 변경 이력 저장 (오류나도 무시)
-    supabase.from('pool_history').insert({
-      pool_id: pool.id,
-      snapshot_data: pool
-    }).catch(() => {});
+    // 변경 이력 저장 (별도의 try-catch로 감싸서 메인 저장을 방해하지 않게 함)
+    try {
+      await supabase.from('pool_history').insert({
+        pool_id: pool.id,
+        snapshot_data: pool
+      });
+    } catch (historyErr) {
+      // 이력 저장 실패는 무시 가능
+    }
 
     return { success: true };
   } catch (e: any) {
-    console.error("[Storage] Save Exception:", e);
     return { success: false, error: e.message };
   }
 };
