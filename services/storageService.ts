@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Pool, Review, PoolHistory } from '../types';
 
 /**
- * Vite 및 Vercel 환경에서 환경 변수 로드
+ * 환경 변수 로드 (Vite/Vercel 호환)
  */
 const getEnv = (key: string) => {
   return (import.meta as any).env?.[`VITE_${key}`] || 
@@ -21,7 +21,6 @@ if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
     supabase = createClient(supabaseUrl, supabaseKey, {
       auth: { persistSession: false }
     });
-    console.log("[Storage] Supabase client initialized.");
   } catch (e) {
     console.error("[Storage] Supabase init failed:", e);
   }
@@ -29,9 +28,6 @@ if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
 
 const STORAGE_KEY = 'swimming_app_universal_pools';
 
-/**
- * 로컬 스토리지 저장 보조 함수
- */
 const saveToLocal = (pools: Pool[]) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(pools));
 };
@@ -39,7 +35,6 @@ const saveToLocal = (pools: Pool[]) => {
 export const getStoredPools = async (): Promise<Pool[]> => {
   let pools: Pool[] = [];
   
-  // 1. DB 시도
   if (supabase) {
     try {
       const { data, error } = await supabase
@@ -54,15 +49,15 @@ export const getStoredPools = async (): Promise<Pool[]> => {
           address: item.address,
           region: item.region,
           phone: item.phone,
-          homepageUrl: item.homepage_url, // DB의 homepage_url을 인터페이스의 homepageUrl로 매핑
+          homepageUrl: item.homepage_url,
           imageUrl: item.image_url,
           lat: item.lat,
           lng: item.lng,
           lanes: item.lanes,
           length: item.length,
-          hasKidsPool: item.has_kids_pool,
-          hasHeatedPool: item.has_heated_pool,
-          hasWalkingLane: item.has_walking_lane,
+          hasKidsPool: !!item.has_kids_pool,
+          hasHeatedPool: !!item.has_heated_pool,
+          hasWalkingLane: !!item.has_walking_lane,
           extraFeatures: item.extra_features,
           freeSwimSchedule: item.free_swim_schedule || [],
           fees: item.fees || [],
@@ -80,70 +75,71 @@ export const getStoredPools = async (): Promise<Pool[]> => {
     }
   }
   
-  // 2. DB 실패 시 로컬 시도
   const local = localStorage.getItem(STORAGE_KEY);
   return local ? JSON.parse(local) : [];
 };
 
-export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string, code?: string}> => {
-  // 로컬 업데이트 선행
+export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string}> => {
+  // 1. 로컬 저장 (즉각적인 피드백)
   const currentPools = await getStoredPools();
   const index = currentPools.findIndex(p => p.id === pool.id);
   let updatedPools = [...currentPools];
-  
-  if (index >= 0) {
-    updatedPools[index] = pool;
-  } else {
-    updatedPools = [pool, ...updatedPools];
-  }
+  if (index >= 0) updatedPools[index] = pool;
+  else updatedPools = [pool, ...updatedPools];
   saveToLocal(updatedPools);
 
   if (!supabase) {
+    console.warn("[Storage] No Supabase client. Local save only.");
     return { success: true };
   }
 
   try {
-    const payload: any = {
+    // 2. DB 컬럼명과 1:1 매핑 (Snake Case)
+    const payload = {
       id: pool.id,
       name: pool.name,
       address: pool.address,
       region: pool.region,
-      phone: pool.phone,
-      homepage_url: pool.homepageUrl, // 인터페이스의 homepageUrl을 DB의 homepage_url 컬럼으로 저장
-      image_url: pool.imageUrl,
+      phone: pool.phone || "",
+      homepage_url: pool.homepageUrl || "",
+      image_url: pool.imageUrl || "",
       lat: pool.lat,
       lng: pool.lng,
-      lanes: pool.lanes,
-      length: pool.length,
-      has_kids_pool: pool.hasKidsPool,
-      has_heated_pool: pool.hasHeatedPool,
-      has_walking_lane: pool.hasWalkingLane,
-      extra_features: pool.extraFeatures,
-      free_swim_schedule: pool.freeSwimSchedule,
-      fees: pool.fees,
-      closed_days: pool.closedDays,
-      holiday_options: pool.holidayOptions,
-      reviews: pool.reviews,
+      lanes: pool.lanes || 0,
+      length: pool.length || 0,
+      has_kids_pool: !!pool.hasKidsPool,
+      has_heated_pool: !!pool.hasHeatedPool,
+      has_walking_lane: !!pool.hasWalkingLane,
+      extra_features: pool.extraFeatures || "",
+      free_swim_schedule: pool.freeSwimSchedule || [],
+      fees: pool.fees || [],
+      closed_days: pool.closedDays || "",
+      holiday_options: pool.holidayOptions || null,
+      reviews: pool.reviews || [],
       is_public: pool.isPublic !== false
     };
 
-    const { error } = await supabase.from('pools').upsert(payload, { onConflict: 'id' });
+    // Upsert 시도
+    const { error } = await supabase
+      .from('pools')
+      .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      console.error("[Storage] DB Upsert Error:", error);
-      return { success: false, error: error.message }; 
+      console.error("[Storage] Supabase Error:", error.message, error.details, error.hint);
+      return { success: false, error: error.message };
     }
 
-    // 히스토리 저장
-    try {
-      await supabase.from('pool_history').insert({
-        pool_id: pool.id,
-        snapshot_data: pool
-      });
-    } catch (hErr) {}
+    // 3. 히스토리 기록 (비동기로 실행)
+    supabase.from('pool_history').insert({
+      pool_id: pool.id,
+      snapshot_data: pool
+    }).then(({error: hErr}) => {
+      if(hErr) console.warn("[Storage] History save failed:", hErr.message);
+    });
 
     return { success: true };
   } catch (e: any) {
+    console.error("[Storage] Save Exception:", e);
     return { success: false, error: e.message };
   }
 };
