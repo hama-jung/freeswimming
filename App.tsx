@@ -67,7 +67,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [editingPool, setEditingPool] = useState<Pool | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<{text: string, type: 'success'|'error', code?: string} | null>(null);
-  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<Region | "내주변">("전체");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPoolDetail, setSelectedPoolDetail] = useState<Pool | null>(null);
@@ -97,22 +96,28 @@ function App() {
     }
   };
 
-  const showToast = (text: string, type: 'success'|'error' = 'success', code?: string) => {
-    setToastMessage({ text, type, code });
-    if (type === 'success') setTimeout(() => setToastMessage(null), 5000);
-  };
-
   const handleUpdatePoolData = async (updatedPool: Pool) => {
+    // 1. 저장 의사 확인
+    if (!window.confirm("입력하신 수영장 정보를 저장하시겠습니까?")) {
+      return;
+    }
+
     setIsLoading(true);
     try {
+      // 2. 서비스 레이어를 통해 DB 저장 시도
       const result = await savePool(updatedPool);
+      
       if (result.success) {
-        const freshList = await getStoredPools();
-        setPools(freshList);
-        const freshMatch = freshList.find(p => p.id === updatedPool.id);
-        if (freshMatch) setSelectedPoolDetail({ ...freshMatch });
-        showToast("정보가 저장되었습니다.");
+        // 3. 성공 알림 및 페이지 새로고침
+        alert("정보가 안전하게 저장되었습니다.");
+        window.location.reload(); // 강제 새로고침으로 데이터 동기화
+      } else {
+        // 4. 실패 알림
+        alert(`저장에 실패했습니다: ${result.error || '알 수 없는 오류'}`);
       }
+    } catch (err: any) {
+      console.error("Save Error:", err);
+      alert("서버 통신 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -173,21 +178,6 @@ function App() {
         </div>
       )}
 
-      {toastMessage && (
-        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] w-[90%] max-w-lg p-6 rounded-[32px] shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom-4 transition-all ${toastMessage.type === 'success' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white'}`}>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              {toastMessage.type === 'success' ? <CheckCircle className="w-6 h-6 text-emerald-400" /> : <AlertTriangle className="w-6 h-6 text-yellow-300" />}
-              <div className="flex flex-col">
-                <span className="text-base font-black">{toastMessage.type === 'success' ? '성공' : '오류'}</span>
-                <span className="text-sm font-bold opacity-90">{toastMessage.text}</span>
-              </div>
-            </div>
-            <button onClick={() => setToastMessage(null)} className="text-white/50 hover:text-white p-1"><X size={20} /></button>
-          </div>
-        </div>
-      )}
-
       <header className="bg-white border-b border-slate-100 z-50 sticky top-0 shrink-0">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
           <button className="flex items-center gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
@@ -211,11 +201,7 @@ function App() {
       {view === 'form' ? (
         <PoolFormPage 
           initialData={editingPool} 
-          onSave={async (p) => {
-            setEditingPool(undefined);
-            setView('list');
-            await handleUpdatePoolData(p);
-          }} 
+          onSave={handleUpdatePoolData} 
           onCancel={() => { setView('list'); setEditingPool(undefined); }} 
         />
       ) : (
@@ -251,9 +237,9 @@ function App() {
                   <CalendarCheck size={20} />
                   <span className="text-[10px] font-black mt-1">오늘가능</span>
                 </button>
-                <button onClick={() => setIsMobileFilterOpen(true)} className="flex-1 flex flex-col items-center justify-center h-14 bg-slate-900 text-white rounded-2xl transition-all border-2 border-slate-900 shadow-md">
+                <button onClick={() => setSelectedRegion("전체")} className="flex-1 flex flex-col items-center justify-center h-14 bg-slate-900 text-white rounded-2xl transition-all border-2 border-slate-900 shadow-md">
                   <Filter size={20} />
-                  <span className="text-[10px] font-black mt-1">필터</span>
+                  <span className="text-[10px] font-black mt-1">전체보기</span>
                 </button>
               </div>
             </div>
@@ -284,9 +270,11 @@ function App() {
           onDeleteRequest={async (id) => { 
             if(confirm('삭제하시겠습니까?')) {
               setIsLoading(true);
-              await deletePool(id); 
-              await loadData(); 
-              setSelectedPoolDetail(null); 
+              const ok = await deletePool(id); 
+              if(ok) {
+                alert("삭제되었습니다.");
+                window.location.reload();
+              }
               setIsLoading(false);
             }
           }}

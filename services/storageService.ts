@@ -80,7 +80,7 @@ export const getStoredPools = async (): Promise<Pool[]> => {
 };
 
 export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string}> => {
-  // 1. 로컬 저장 (즉각적인 피드백)
+  // 로컬 선반영
   const currentPools = await getStoredPools();
   const index = currentPools.findIndex(p => p.id === pool.id);
   let updatedPools = [...currentPools];
@@ -89,12 +89,10 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
   saveToLocal(updatedPools);
 
   if (!supabase) {
-    console.warn("[Storage] No Supabase client. Local save only.");
-    return { success: true };
+    return { success: false, error: "Supabase 연결 정보가 없습니다. 환경 변수를 확인해주세요." };
   }
 
   try {
-    // 2. DB 컬럼명과 1:1 매핑 (Snake Case)
     const payload = {
       id: pool.id,
       name: pool.name,
@@ -119,23 +117,20 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       is_public: pool.isPublic !== false
     };
 
-    // Upsert 시도
     const { error } = await supabase
       .from('pools')
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      console.error("[Storage] Supabase Error:", error.message, error.details, error.hint);
-      return { success: false, error: error.message };
+      console.error("[Storage] Upsert Fail Detail:", error);
+      return { success: false, error: `${error.message} (코드: ${error.code})` };
     }
 
-    // 3. 히스토리 기록 (비동기로 실행)
+    // 변경 이력 저장 (오류나도 무시)
     supabase.from('pool_history').insert({
       pool_id: pool.id,
       snapshot_data: pool
-    }).then(({error: hErr}) => {
-      if(hErr) console.warn("[Storage] History save failed:", hErr.message);
-    });
+    }).catch(() => {});
 
     return { success: true };
   } catch (e: any) {
