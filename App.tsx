@@ -66,7 +66,6 @@ function App() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingPool, setEditingPool] = useState<Pool | undefined>(undefined);
-  const [toastMessage, setToastMessage] = useState<{text: string, type: 'success'|'error', code?: string} | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<Region | "내주변">("전체");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPoolDetail, setSelectedPoolDetail] = useState<Pool | null>(null);
@@ -108,16 +107,17 @@ function App() {
       const result = await savePool(updatedPool);
       
       if (result.success) {
-        // 3. 성공 알림 및 페이지 새로고침
+        // 3. 성공 알림창 띄우기
         alert("정보가 안전하게 저장되었습니다.");
-        window.location.reload(); // 강제 새로고침으로 데이터 동기화
+        // 4. 확인 누르면 페이지 새로고침
+        window.location.reload(); 
       } else {
-        // 4. 실패 알림
-        alert(`저장에 실패했습니다: ${result.error || '알 수 없는 오류'}`);
+        // 5. 실패 시 원인 알림
+        alert(`저장에 실패했습니다.\n사유: ${result.error || '알 수 없는 오류'}\n\n도움말: DB에 'homepage_url' 컬럼이 있는지 확인해 주세요.`);
       }
     } catch (err: any) {
       console.error("Save Error:", err);
-      alert("서버 통신 중 오류가 발생했습니다.");
+      alert("서버와 통신하는 중에 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -174,7 +174,7 @@ function App() {
       {isLoading && (
         <div className="fixed inset-0 z-[200] bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center">
           <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
-          <p className="font-bold text-slate-600">데이터 처리 중...</p>
+          <p className="font-bold text-slate-600">처리 중입니다...</p>
         </div>
       )}
 
@@ -268,11 +268,11 @@ function App() {
           onUpdatePool={handleUpdatePoolData}
           onEditRequest={(p) => { setEditingPool(p); setView('form'); setSelectedPoolDetail(null); }}
           onDeleteRequest={async (id) => { 
-            if(confirm('삭제하시겠습니까?')) {
+            if(confirm('정말로 이 수영장 정보를 삭제하시겠습니까?')) {
               setIsLoading(true);
               const ok = await deletePool(id); 
               if(ok) {
-                alert("삭제되었습니다.");
+                alert("정보가 삭제되었습니다.");
                 window.location.reload();
               }
               setIsLoading(false);
