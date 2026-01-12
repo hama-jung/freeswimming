@@ -54,7 +54,7 @@ export const getStoredPools = async (): Promise<Pool[]> => {
           address: item.address,
           region: item.region,
           phone: item.phone,
-          homepageUrl: item.homepage_url, // 추가된 부분
+          homepageUrl: item.homepage_url, // DB의 homepage_url을 인터페이스의 homepageUrl로 매핑
           imageUrl: item.image_url,
           lat: item.lat,
           lng: item.lng,
@@ -86,7 +86,7 @@ export const getStoredPools = async (): Promise<Pool[]> => {
 };
 
 export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string, code?: string}> => {
-  // 로컬 업데이트 선행 (DB 연결 여부와 상관없이 사용자 경험을 위해)
+  // 로컬 업데이트 선행
   const currentPools = await getStoredPools();
   const index = currentPools.findIndex(p => p.id === pool.id);
   let updatedPools = [...currentPools];
@@ -98,9 +98,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
   }
   saveToLocal(updatedPools);
 
-  // Supabase가 없으면 로컬 저장 성공으로 리턴 (오류 메시지 대신)
   if (!supabase) {
-    console.warn("[Storage] Saved to LocalStorage only (Supabase missing)");
     return { success: true };
   }
 
@@ -111,7 +109,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       address: pool.address,
       region: pool.region,
       phone: pool.phone,
-      homepage_url: pool.homepageUrl, // 추가된 부분
+      homepage_url: pool.homepageUrl, // 인터페이스의 homepageUrl을 DB의 homepage_url 컬럼으로 저장
       image_url: pool.imageUrl,
       lat: pool.lat,
       lng: pool.lng,
@@ -121,7 +119,6 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       has_heated_pool: pool.hasHeatedPool,
       has_walking_lane: pool.hasWalkingLane,
       extra_features: pool.extraFeatures,
-      // Fix: Corrected property name from free_swim_schedule to freeSwimSchedule
       free_swim_schedule: pool.freeSwimSchedule,
       fees: pool.fees,
       closed_days: pool.closedDays,
@@ -134,8 +131,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
 
     if (error) {
       console.error("[Storage] DB Upsert Error:", error);
-      // DB 에러가 나더라도 이미 로컬엔 저장되었으므로 경고만 띄우거나 함
-      return { success: true }; 
+      return { success: false, error: error.message }; 
     }
 
     // 히스토리 저장
@@ -148,8 +144,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
 
     return { success: true };
   } catch (e: any) {
-    // 예외 발생 시에도 이미 로컬 저장은 완료됨
-    return { success: true };
+    return { success: false, error: e.message };
   }
 };
 
