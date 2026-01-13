@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy, ChevronRight } from 'lucide-react';
+import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy, ChevronRight, Settings2 } from 'lucide-react';
 import { Pool, Region } from './types';
 import { MOCK_POOLS, REGIONS } from './constants';
 import PoolCard from './components/PoolCard';
@@ -72,6 +72,7 @@ function App() {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -96,23 +97,17 @@ function App() {
   };
 
   const handleUpdatePoolData = async (updatedPool: Pool) => {
-    // 1. 저장 의사 확인
     if (!window.confirm("입력하신 수영장 정보를 저장하시겠습니까?")) {
       return;
     }
 
     setIsLoading(true);
     try {
-      // 2. 서비스 레이어를 통해 DB 저장 시도
       const result = await savePool(updatedPool);
-      
       if (result.success) {
-        // 3. 성공 알림창 띄우기
         alert("정보가 안전하게 저장되었습니다.");
-        // 4. 확인 누르면 페이지 새로고침
         window.location.reload(); 
       } else {
-        // 5. 실패 시 원인 알림
         alert(`저장에 실패했습니다.\n사유: ${result.error || '알 수 없는 오류'}\n\n도움말: DB에 'homepage_url' 컬럼이 있는지 확인해 주세요.`);
       }
     } catch (err: any) {
@@ -141,6 +136,9 @@ function App() {
   };
 
   const isTodaySelected = selectedDate === todayStr;
+  const isFilterActive = useMemo(() => {
+    return searchQuery !== "" || selectedRegion !== "전체" || selectedDate !== todayStr || showAvailableOnly;
+  }, [searchQuery, selectedRegion, selectedDate, showAvailableOnly, todayStr]);
 
   const processedPools = useMemo(() => {
     const targetDateObj = new Date(selectedDate);
@@ -237,9 +235,12 @@ function App() {
                   <CalendarCheck size={20} />
                   <span className="text-[10px] font-black mt-1">오늘가능</span>
                 </button>
-                <button onClick={() => setSelectedRegion("전체")} className="flex-1 flex flex-col items-center justify-center h-14 bg-slate-900 text-white rounded-2xl transition-all border-2 border-slate-900 shadow-md">
+                <button onClick={() => setIsFilterOpen(true)} className={`flex-1 relative flex flex-col items-center justify-center h-14 rounded-2xl transition-all border-2 ${isFilterActive ? 'bg-brand-50 border-brand-200 text-brand-600 shadow-md' : 'bg-slate-900 border-slate-900 text-white shadow-md'}`}>
                   <Filter size={20} />
-                  <span className="text-[10px] font-black mt-1">전체보기</span>
+                  <span className="text-[10px] font-black mt-1">상세 검색</span>
+                  {isFilterActive && (
+                    <div className="absolute top-2 right-4 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+                  )}
                 </button>
               </div>
             </div>
@@ -259,6 +260,77 @@ function App() {
             )}
           </main>
         </>
+      )}
+
+      {/* 모바일 상세 검색 오버레이 */}
+      {isFilterOpen && (
+        <div className="fixed inset-0 z-[150] flex items-end sm:hidden bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full bg-white rounded-t-[40px] shadow-2xl flex flex-col max-h-[92vh] animate-in slide-in-from-bottom duration-300">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Settings2 className="text-brand-600" /> 상세 검색 설정
+              </h3>
+              <button onClick={() => setIsFilterOpen(false)} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><X /></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">수영장 명칭 또는 주소</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    placeholder="예: 송파, 올림픽..."
+                    className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-lg focus:border-brand-500 focus:bg-white transition-all outline-none" 
+                  />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">보기 방식</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setDisplayMode('map')} className={`flex items-center justify-center gap-2 h-14 rounded-2xl font-black text-sm transition-all border-2 ${displayMode === 'map' ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500'}`}><MapIcon size={18} /> 지도</button>
+                  <button onClick={() => setDisplayMode('list')} className={`flex items-center justify-center gap-2 h-14 rounded-2xl font-black text-sm transition-all border-2 ${displayMode === 'list' ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500'}`}><ListIcon size={18} /> 목록</button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">검색 기준일</label>
+                <div className="relative">
+                  <input 
+                    type="date" 
+                    value={selectedDate} 
+                    onChange={(e) => setSelectedDate(e.target.value)} 
+                    className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-lg outline-none" 
+                  />
+                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">지역 선택</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {REGIONS.map(r => (
+                    <button 
+                      key={r} 
+                      onClick={() => setSelectedRegion(r)}
+                      className={`h-12 rounded-xl font-black text-xs transition-all border-2 ${selectedRegion === r ? 'bg-brand-50 border-brand-500 text-brand-600' : 'bg-slate-50 border-slate-50 text-slate-400'}`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
+              <button onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setSelectedDate(todayStr); setShowAvailableOnly(false); }} className="flex-1 h-14 bg-white border-2 border-slate-200 rounded-2xl font-black text-slate-500 active:scale-95 transition-all">초기화</button>
+              <button onClick={() => setIsFilterOpen(false)} className="flex-[2] h-14 bg-brand-600 text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all">검색 결과 적용하기</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {selectedPoolDetail && (
