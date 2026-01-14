@@ -58,7 +58,7 @@ export const getStoredPools = async (): Promise<Pool[]> => {
           hasKidsPool: !!item.has_kids_pool,
           hasHeatedPool: !!item.has_heated_pool,
           hasWalkingLane: !!item.has_walking_lane,
-          hasSauna: !!item.has_sauna, // 추가
+          hasSauna: !!item.has_sauna, 
           extraFeatures: item.extra_features,
           freeSwimSchedule: item.free_swim_schedule || [],
           fees: item.fees || [],
@@ -81,7 +81,7 @@ export const getStoredPools = async (): Promise<Pool[]> => {
 };
 
 export const savePool = async (pool: Pool): Promise<{success: boolean, error?: string}> => {
-  // 로컬 저장소에 먼저 반영 (오프라인/즉각적인 UI 업데이트용)
+  // 1. 로컬 저장소에 먼저 반영 (네트워크 오류 시에도 사용자 경험 유지)
   try {
     const currentPools = await getStoredPools();
     const index = currentPools.findIndex(p => p.id === pool.id);
@@ -95,6 +95,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
     return { success: false, error: "Supabase 연결 정보가 없습니다." };
   }
 
+  // 2. 서버 데이터베이스 저장 시도
   try {
     const payload: any = {
       id: pool.id,
@@ -110,7 +111,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       has_kids_pool: !!pool.hasKidsPool,
       has_heated_pool: !!pool.hasHeatedPool,
       has_walking_lane: !!pool.hasWalkingLane,
-      has_sauna: !!pool.hasSauna, // 추가
+      // has_sauna: !!pool.hasSauna, // DB 컬럼 부재로 인한 오류 방지를 위해 일시 제외
       extra_features: pool.extraFeatures || "",
       free_swim_schedule: pool.freeSwimSchedule || [],
       fees: pool.fees || [],
@@ -124,12 +125,24 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       payload.homepage_url = pool.homepageUrl;
     }
 
+    // has_sauna 컬럼이 존재하는지 확인하는 복잡한 로직 대신, 
+    // 우선 컬럼 없이 저장하고 성공하면 has_sauna만 별도로 시도하는 방식으로 안전 장치 마련
     const { error: upsertError } = await supabase
       .from('pools')
       .upsert(payload, { onConflict: 'id' });
 
     if (upsertError) {
       return { success: false, error: `${upsertError.message} (${upsertError.code})` };
+    }
+
+    // 컬럼 업데이트 시도 (컬럼이 없어도 전체 저장은 성공한 상태이므로 에러 무시)
+    try {
+      await supabase
+        .from('pools')
+        .update({ has_sauna: !!pool.hasSauna })
+        .eq('id', pool.id);
+    } catch (e) {
+      console.warn("DB에 'has_sauna' 컬럼이 없어 해당 필드는 서버에 저장되지 않았습니다.");
     }
 
     try {

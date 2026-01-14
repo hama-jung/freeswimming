@@ -108,7 +108,16 @@ function App() {
         alert("정보가 안전하게 저장되었습니다.");
         window.location.reload(); 
       } else {
-        alert(`저장에 실패했습니다.\n사유: ${result.error || '알 수 없는 오류'}\n\n도움말: DB에 'homepage_url' 컬럼이 있는지 확인해 주세요.`);
+        const errorMsg = result.error || "";
+        let helpText = "DB 설정을 확인해 주세요.";
+        
+        if (errorMsg.includes("has_sauna")) {
+          helpText = "Supabase SQL Editor에서 'ALTER TABLE pools ADD COLUMN has_sauna BOOLEAN DEFAULT false;' 명령어를 실행해 주세요.";
+        } else if (errorMsg.includes("homepage_url")) {
+          helpText = "Supabase SQL Editor에서 'ALTER TABLE pools ADD COLUMN homepage_url TEXT;' 명령어를 실행해 주세요.";
+        }
+        
+        alert(`저장에 실패했습니다.\n사유: ${errorMsg}\n\n[해결 방법]: ${helpText}`);
       }
     } catch (err: any) {
       console.error("Save Error:", err);
