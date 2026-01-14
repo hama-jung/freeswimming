@@ -136,8 +136,10 @@ function App() {
   };
 
   const isTodaySelected = selectedDate === todayStr;
+  
+  // 필터 활성화 상태 체크 (배지 표시용)
   const isFilterActive = useMemo(() => {
-    return searchQuery !== "" || selectedRegion !== "전체" || selectedDate !== todayStr || showAvailableOnly;
+    return searchQuery !== "" || (selectedRegion !== "전체" && selectedRegion !== "내주변") || selectedDate !== todayStr || showAvailableOnly;
   }, [searchQuery, selectedRegion, selectedDate, showAvailableOnly, todayStr]);
 
   const processedPools = useMemo(() => {
@@ -171,26 +173,26 @@ function App() {
     <div className={`flex flex-col font-sans bg-[#f8fafc] ${displayMode === 'map' && view === 'list' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       {isLoading && (
         <div className="fixed inset-0 z-[200] bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center">
-          <Loader2 className="w-12 h-12 text-brand-600 animate-spin mb-4" />
-          <p className="font-bold text-slate-600">처리 중입니다...</p>
+          <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-brand-600 animate-spin mb-4" />
+          <p className="font-bold text-sm sm:text-base text-slate-600">처리 중입니다...</p>
         </div>
       )}
 
       <header className="bg-white border-b border-slate-100 z-50 sticky top-0 shrink-0">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-          <button className="flex items-center gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-lg">
-              <Waves size={24} strokeWidth={2.5} />
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-14 sm:h-20 flex items-center justify-between">
+          <button className="flex items-center gap-2 sm:gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
+            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-brand-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg">
+              <Waves size={20} className="sm:size-6" strokeWidth={2.5} />
             </div>
-            <h1 className="text-lg sm:text-2xl font-black text-slate-900">자유수영.kr</h1>
+            <h1 className="text-base sm:text-2xl font-black text-slate-900">자유수영.kr</h1>
           </button>
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex bg-slate-100 p-1 rounded-2xl mr-4">
               <button onClick={() => setDisplayMode('map')} className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-black transition-all ${displayMode === 'map' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}><MapIcon size={18} /> 지도</button>
               <button onClick={() => setDisplayMode('list')} className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-black transition-all ${displayMode === 'list' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}><ListIcon size={18} /> 목록</button>
             </div>
-            <button onClick={() => setView('form')} className="bg-brand-600 text-white px-4 sm:px-6 h-10 sm:h-12 rounded-xl font-black text-xs sm:text-sm shadow-md active:scale-95 flex items-center gap-2 transition-all">
-              <Plus size={18} strokeWidth={3} /> <span className="hidden sm:inline">수영장 등록</span><span className="sm:hidden">등록</span>
+            <button onClick={() => setView('form')} className="bg-brand-600 text-white px-3 sm:px-6 h-9 sm:h-12 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-sm shadow-md active:scale-95 flex items-center gap-1.5 transition-all">
+              <Plus size={14} className="sm:size-5" strokeWidth={3} /> <span className="hidden sm:inline">수영장 등록</span><span className="sm:hidden">등록</span>
             </button>
           </div>
         </div>
@@ -204,8 +206,9 @@ function App() {
         />
       ) : (
         <>
-          <div className="bg-white border-b border-slate-100 z-40 sticky top-16 sm:top-20 shrink-0">
+          <div className="bg-white border-b border-slate-100 z-40 sticky top-14 sm:top-20 shrink-0">
             <div className="max-w-[1280px] mx-auto">
+              {/* 데스크탑 필터바 */}
               <div className="hidden sm:flex px-6 py-4 gap-4 items-center border-b border-slate-50">
                 <div className="relative flex-1 max-md">
                   <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="어느 수영장을 찾으세요?" className="w-full pl-12 pr-4 h-14 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all outline-none" />
@@ -226,20 +229,21 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex sm:hidden px-4 py-3 justify-center items-center gap-4">
-                <button onClick={handleNearMe} className={`flex-1 flex flex-col items-center justify-center h-14 rounded-2xl transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
-                  <LocateFixed size={20} />
-                  <span className="text-[10px] font-black mt-1">내주변</span>
+              {/* 모바일 퀵 버튼 바 */}
+              <div className="flex sm:hidden px-4 py-2.5 justify-center items-center gap-3">
+                <button onClick={handleNearMe} className={`flex-1 flex flex-col items-center justify-center h-12 rounded-xl transition-all border ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                  <LocateFixed size={18} />
+                  <span className="text-[9px] font-black mt-1 uppercase">Nearby</span>
                 </button>
-                <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`flex-1 flex flex-col items-center justify-center h-14 rounded-2xl transition-all border-2 ${!isTodaySelected ? 'bg-slate-100 text-slate-200 border-slate-50' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-md' : 'bg-slate-50 border-slate-100 text-slate-500')}`}>
-                  <CalendarCheck size={20} />
-                  <span className="text-[10px] font-black mt-1">오늘가능</span>
+                <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`flex-1 flex flex-col items-center justify-center h-12 rounded-xl transition-all border ${!isTodaySelected ? 'bg-slate-100 text-slate-200 border-slate-50' : (showAvailableOnly ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400')}`}>
+                  <CalendarCheck size={18} />
+                  <span className="text-[9px] font-black mt-1 uppercase">Today</span>
                 </button>
-                <button onClick={() => setIsFilterOpen(true)} className={`flex-1 relative flex flex-col items-center justify-center h-14 rounded-2xl transition-all border-2 ${isFilterActive ? 'bg-brand-50 border-brand-200 text-brand-600 shadow-md' : 'bg-slate-900 border-slate-900 text-white shadow-md'}`}>
-                  <Filter size={20} />
-                  <span className="text-[10px] font-black mt-1">상세 검색</span>
+                <button onClick={() => setIsFilterOpen(true)} className={`flex-1 relative flex flex-col items-center justify-center h-12 rounded-xl transition-all border ${isFilterActive ? 'bg-brand-50 border-brand-200 text-brand-600 shadow-sm' : 'bg-slate-900 border-slate-900 text-white shadow-sm'}`}>
+                  <Filter size={18} />
+                  <span className="text-[9px] font-black mt-1 uppercase">상세 검색</span>
                   {isFilterActive && (
-                    <div className="absolute top-2 right-4 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse"></div>
+                    <div className="absolute top-1.5 right-3 w-1.5 h-1.5 bg-red-500 rounded-full border border-white"></div>
                   )}
                 </button>
               </div>
@@ -252,8 +256,8 @@ function App() {
                 <KoreaMap pools={processedPools} onSelectPool={setSelectedPoolDetail} userLocation={userLocation} selectedRegion={selectedRegion} onRequestLocation={handleNearMe} />
               </div>
             ) : (
-              <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 py-8 sm:py-16">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
+              <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 py-6 sm:py-16">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-10">
                   {processedPools.map(p => <PoolCard key={p.id} pool={p} onClick={setSelectedPoolDetail} distance={p.distance} />)}
                 </div>
               </div>
@@ -262,61 +266,63 @@ function App() {
         </>
       )}
 
-      {/* 모바일 상세 검색 오버레이 */}
+      {/* 모바일 전용 상세 검색 오버레이 */}
       {isFilterOpen && (
         <div className="fixed inset-0 z-[150] flex items-end sm:hidden bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full bg-white rounded-t-[40px] shadow-2xl flex flex-col max-h-[92vh] animate-in slide-in-from-bottom duration-300">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
-              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                <Settings2 className="text-brand-600" /> 상세 검색 설정
+          <div className="w-full bg-white rounded-t-[32px] shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
+            {/* 오버레이 헤더 */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <Settings2 className="text-brand-600 w-5 h-5" /> 상세 검색 설정
               </h3>
-              <button onClick={() => setIsFilterOpen(false)} className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><X /></button>
+              <button onClick={() => setIsFilterOpen(false)} className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><X size={18} /></button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
-              <div className="space-y-3">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">수영장 명칭 또는 주소</label>
+            {/* 오버레이 본문 */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-6 no-scrollbar">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">시설명 또는 주소 검색</label>
                 <div className="relative">
                   <input 
                     type="text" 
                     value={searchQuery} 
                     onChange={(e) => setSearchQuery(e.target.value)} 
-                    placeholder="예: 송파, 올림픽..."
-                    className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-lg focus:border-brand-500 focus:bg-white transition-all outline-none" 
+                    placeholder="수영장 이름을 입력하세요"
+                    className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-brand-500 focus:bg-white transition-all outline-none" 
                   />
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">보기 방식</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setDisplayMode('map')} className={`flex items-center justify-center gap-2 h-14 rounded-2xl font-black text-sm transition-all border-2 ${displayMode === 'map' ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500'}`}><MapIcon size={18} /> 지도</button>
-                  <button onClick={() => setDisplayMode('list')} className={`flex items-center justify-center gap-2 h-14 rounded-2xl font-black text-sm transition-all border-2 ${displayMode === 'list' ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-500'}`}><ListIcon size={18} /> 목록</button>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">보기 방식 선택</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setDisplayMode('map')} className={`flex items-center justify-center gap-2 h-11 rounded-xl font-black text-xs transition-all border ${displayMode === 'map' ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}><MapIcon size={16} /> 지도 중심</button>
+                  <button onClick={() => setDisplayMode('list')} className={`flex items-center justify-center gap-2 h-11 rounded-xl font-black text-xs transition-all border ${displayMode === 'list' ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}><ListIcon size={16} /> 목록 중심</button>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">검색 기준일</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">검색 기준일 설정</label>
                 <div className="relative">
                   <input 
                     type="date" 
                     value={selectedDate} 
                     onChange={(e) => setSelectedDate(e.target.value)} 
-                    className="w-full h-14 pl-12 pr-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-lg outline-none" 
+                    className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
                   />
-                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">지역 선택</label>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">지역별 필터</label>
+                <div className="grid grid-cols-4 gap-1.5">
                   {REGIONS.map(r => (
                     <button 
                       key={r} 
                       onClick={() => setSelectedRegion(r)}
-                      className={`h-12 rounded-xl font-black text-xs transition-all border-2 ${selectedRegion === r ? 'bg-brand-50 border-brand-500 text-brand-600' : 'bg-slate-50 border-slate-50 text-slate-400'}`}
+                      className={`h-9 rounded-lg font-black text-[10px] transition-all border ${selectedRegion === r ? 'bg-brand-50 border-brand-400 text-brand-600' : 'bg-slate-50 border-slate-50 text-slate-400'}`}
                     >
                       {r}
                     </button>
@@ -325,9 +331,20 @@ function App() {
               </div>
             </div>
 
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-3">
-              <button onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setSelectedDate(todayStr); setShowAvailableOnly(false); }} className="flex-1 h-14 bg-white border-2 border-slate-200 rounded-2xl font-black text-slate-500 active:scale-95 transition-all">초기화</button>
-              <button onClick={() => setIsFilterOpen(false)} className="flex-[2] h-14 bg-brand-600 text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all">검색 결과 적용하기</button>
+            {/* 오버레이 푸터 */}
+            <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-2">
+              <button 
+                onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setSelectedDate(todayStr); setShowAvailableOnly(false); }} 
+                className="flex-1 h-12 bg-white border border-slate-200 rounded-xl font-black text-xs text-slate-400 active:scale-95 transition-all"
+              >
+                초기화
+              </button>
+              <button 
+                onClick={() => setIsFilterOpen(false)} 
+                className="flex-[2] h-12 bg-brand-600 text-white rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all"
+              >
+                검색 결과 적용하기
+              </button>
             </div>
           </div>
         </div>

@@ -54,6 +54,7 @@ export interface Pool {
   hasKidsPool: boolean;
   hasHeatedPool: boolean;
   hasWalkingLane: boolean;
+  hasSauna: boolean; // 체온조절실 추가
   extraFeatures: string;
 
   freeSwimSchedule: FreeSwimSchedule[];

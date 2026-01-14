@@ -20,6 +20,8 @@ export const MOCK_POOLS: Pool[] = [
     hasKidsPool: true,
     hasHeatedPool: false,
     hasWalkingLane: false,
+    // Fix: Added missing hasSauna property
+    hasSauna: true,
     extraFeatures: "",
     freeSwimSchedule: [
         { day: "평일(월-금)", startTime: "13:00", endTime: "13:50" },
@@ -48,6 +50,8 @@ export const MOCK_POOLS: Pool[] = [
     hasKidsPool: false,
     hasHeatedPool: false,
     hasWalkingLane: false,
+    // Fix: Added missing hasSauna property
+    hasSauna: false,
     extraFeatures: "",
     freeSwimSchedule: [
         { day: "평일(월-금)", startTime: "06:00", endTime: "21:00" },
@@ -74,6 +78,8 @@ export const MOCK_POOLS: Pool[] = [
     hasKidsPool: true,
     hasHeatedPool: false,
     hasWalkingLane: false,
+    // Fix: Added missing hasSauna property
+    hasSauna: true,
     extraFeatures: "",
     freeSwimSchedule: [
         { day: "평일(월-금)", startTime: "06:00", endTime: "21:00" },
@@ -100,6 +106,8 @@ export const MOCK_POOLS: Pool[] = [
     hasKidsPool: true,
     hasHeatedPool: false,
     hasWalkingLane: false,
+    // Fix: Added missing hasSauna property
+    hasSauna: false,
     extraFeatures: "",
     freeSwimSchedule: [
         { day: "평일(월-금)", startTime: "06:00", endTime: "09:00" },

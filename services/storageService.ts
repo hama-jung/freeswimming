@@ -58,6 +58,7 @@ export const getStoredPools = async (): Promise<Pool[]> => {
           hasKidsPool: !!item.has_kids_pool,
           hasHeatedPool: !!item.has_heated_pool,
           hasWalkingLane: !!item.has_walking_lane,
+          hasSauna: !!item.has_sauna, // 추가
           extraFeatures: item.extra_features,
           freeSwimSchedule: item.free_swim_schedule || [],
           fees: item.fees || [],
@@ -109,6 +110,7 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       has_kids_pool: !!pool.hasKidsPool,
       has_heated_pool: !!pool.hasHeatedPool,
       has_walking_lane: !!pool.hasWalkingLane,
+      has_sauna: !!pool.hasSauna, // 추가
       extra_features: pool.extraFeatures || "",
       free_swim_schedule: pool.freeSwimSchedule || [],
       fees: pool.fees || [],
@@ -118,12 +120,10 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       is_public: pool.isPublic !== false
     };
 
-    // homepage_url 컬럼이 DB에 없을 수도 있으므로 안전하게 조건부 할당
     if (pool.homepageUrl !== undefined) {
       payload.homepage_url = pool.homepageUrl;
     }
 
-    // 데이터 업서트
     const { error: upsertError } = await supabase
       .from('pools')
       .upsert(payload, { onConflict: 'id' });
@@ -132,15 +132,12 @@ export const savePool = async (pool: Pool): Promise<{success: boolean, error?: s
       return { success: false, error: `${upsertError.message} (${upsertError.code})` };
     }
 
-    // 변경 이력 저장 (별도의 try-catch로 감싸서 메인 저장을 방해하지 않게 함)
     try {
       await supabase.from('pool_history').insert({
         pool_id: pool.id,
         snapshot_data: pool
       });
-    } catch (historyErr) {
-      // 이력 저장 실패는 무시 가능
-    }
+    } catch (historyErr) {}
 
     return { success: true };
   } catch (e: any) {

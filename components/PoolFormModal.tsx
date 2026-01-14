@@ -24,6 +24,8 @@ const PoolFormModal: React.FC<PoolFormModalProps> = ({ isOpen, onClose, onSave, 
   const [hasKidsPool, setHasKidsPool] = useState(false);
   const [hasHeatedPool, setHasHeatedPool] = useState(false);
   const [hasWalkingLane, setHasWalkingLane] = useState(false);
+  // Fix: Added hasSauna state
+  const [hasSauna, setHasSauna] = useState(false);
   const [extraFeatures, setExtraFeatures] = useState('');
   const [closedDays, setClosedDays] = useState('NONE');
   const [schedules, setSchedules] = useState<FreeSwimSchedule[]>([]);
@@ -40,6 +42,8 @@ const PoolFormModal: React.FC<PoolFormModalProps> = ({ isOpen, onClose, onSave, 
       setHasKidsPool(initialData.hasKidsPool);
       setHasHeatedPool(initialData.hasHeatedPool || false);
       setHasWalkingLane(initialData.hasWalkingLane || false);
+      // Fix: Initialize hasSauna from initialData
+      setHasSauna(initialData.hasSauna || false);
       setExtraFeatures(initialData.extraFeatures || '');
       setClosedDays(initialData.closedDays || 'NONE');
       setSchedules(initialData.freeSwimSchedule || []);
@@ -54,6 +58,8 @@ const PoolFormModal: React.FC<PoolFormModalProps> = ({ isOpen, onClose, onSave, 
       setHasKidsPool(false);
       setHasHeatedPool(false);
       setHasWalkingLane(false);
+      // Fix: Initialize hasSauna to false for new entries
+      setHasSauna(false);
       setExtraFeatures('');
       setClosedDays('NONE');
       setSchedules([{ day: '평일(월-금)', startTime: '09:00', endTime: '18:00' }]);
@@ -96,6 +102,8 @@ const PoolFormModal: React.FC<PoolFormModalProps> = ({ isOpen, onClose, onSave, 
         hasKidsPool,
         hasHeatedPool,
         hasWalkingLane,
+        // Fix: Added missing hasSauna property
+        hasSauna,
         extraFeatures,
         freeSwimSchedule: schedules,
         fees,
@@ -218,10 +226,11 @@ const PoolFormModal: React.FC<PoolFormModalProps> = ({ isOpen, onClose, onSave, 
 
                 <section className="space-y-4">
                     <h4 className="font-bold text-slate-800 text-sm">기타 시설</h4>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <label className={`p-2 rounded-lg border text-[10px] font-bold text-center cursor-pointer ${hasKidsPool ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white text-slate-400'}`}><input type="checkbox" checked={hasKidsPool} onChange={e => setHasKidsPool(e.target.checked)} className="hidden" />유아풀</label>
                         <label className={`p-2 rounded-lg border text-[10px] font-bold text-center cursor-pointer ${hasHeatedPool ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-white text-slate-400'}`}><input type="checkbox" checked={hasHeatedPool} onChange={e => setHasHeatedPool(e.target.checked)} className="hidden" />온수풀</label>
                         <label className={`p-2 rounded-lg border text-[10px] font-bold text-center cursor-pointer ${hasWalkingLane ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white text-slate-400'}`}><input type="checkbox" checked={hasWalkingLane} onChange={e => setHasWalkingLane(e.target.checked)} className="hidden" />걷기레인</label>
+                        <label className={`p-2 rounded-lg border text-[10px] font-bold text-center cursor-pointer ${hasSauna ? 'bg-pink-50 border-pink-200 text-pink-600' : 'bg-white text-slate-400'}`}><input type="checkbox" checked={hasSauna} onChange={e => setHasSauna(e.target.checked)} className="hidden" />체온조절실</label>
                     </div>
                 </section>
 

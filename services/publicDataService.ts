@@ -1,3 +1,4 @@
+
 import { Pool, FreeSwimSchedule, FeeInfo } from '../types';
 
 const API_BASE_URL = 'https://api.data.go.kr/openapi/tn_pubr_public_swimming_pool_api';
@@ -103,6 +104,8 @@ export const fetchPoolsFromPublicApi = async (apiKey: string): Promise<Pool[]> =
             // Fix: Added missing properties required by Pool interface
             hasHeatedPool: false,
             hasWalkingLane: false,
+            // Fix: Added missing hasSauna property
+            hasSauna: false,
             extraFeatures: "",
 
             freeSwimSchedule,
