@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy, ChevronRight, Settings2 } from 'lucide-react';
+import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy, ChevronRight, Settings2, Clock4 } from 'lucide-react';
 import { Pool, Region } from './types';
 import { MOCK_POOLS, REGIONS } from './constants';
 import PoolCard from './components/PoolCard';
@@ -26,37 +26,53 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-function isPoolAvailable(pool: Pool, targetDate: Date, checkRealtime: boolean = false): boolean {
+/**
+ * 특정 수영장이 지정된 날짜와 시간 범위 내에 운영되는지 확인
+ */
+function isPoolAvailableInTimeRange(pool: Pool, targetDate: Date, filterStart: string, filterEnd: string): boolean {
   const dayIndex = targetDate.getDay(); 
   const dayOfMonth = targetDate.getDate();
   const weekOfMonth = Math.ceil(dayOfMonth / 7);
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
   const todayName = dayNames[dayIndex];
+  
   const closed = pool.closedDays || "";
   if (closed.includes(`매주 ${todayName}요일`)) return false;
+
   const schedules = pool.freeSwimSchedule || [];
   const possibleSchedules = schedules.filter(s => {
     const scheduleWeeks = s.weeks || [0];
     const isCorrectWeek = scheduleWeeks.includes(0) || scheduleWeeks.includes(weekOfMonth);
     if (!isCorrectWeek) return false;
+    
     const dayStr = s.day.replace(/\s/g, '');
-    if (dayStr.includes(todayName)) return true;
-    if (todayName === "일" && (dayStr.includes("일요일") || dayStr.includes("주말"))) return true;
-    if (todayName === "토" && (dayStr.includes("토요일") || dayStr.includes("주말"))) return true;
-    if (dayIndex >= 1 && dayIndex <= 5 && dayStr.includes("평일")) return true;
-    return false;
+    let isCorrectDay = false;
+    if (dayStr.includes(todayName)) isCorrectDay = true;
+    else if (todayName === "일" && (dayStr.includes("일요일") || dayStr.includes("주말"))) isCorrectDay = true;
+    else if (todayName === "토" && (dayStr.includes("토요일") || dayStr.includes("주말"))) isCorrectDay = true;
+    else if (dayIndex >= 1 && dayIndex <= 5 && dayStr.includes("평일")) isCorrectDay = true;
+    
+    return isCorrectDay;
   });
+
   if (possibleSchedules.length === 0) return false;
-  if (checkRealtime) {
-    return possibleSchedules.some(s => {
-      if (!s.startTime) return false;
-      const [startH, startM] = s.startTime.split(':').map(Number);
-      return (startH * 60 + startM) >= currentMinutes;
-    });
-  }
-  return true;
+
+  // 시간 필터링 (분 단위 변환 비교)
+  const fStart = timeToMinutes(filterStart);
+  const fEnd = timeToMinutes(filterEnd);
+
+  return possibleSchedules.some(s => {
+    const sStart = timeToMinutes(s.startTime);
+    const sEnd = timeToMinutes(s.endTime);
+    // 운영 시간이 필터 범위와 겹치는지 확인 (교집합 존재 여부)
+    return Math.max(fStart, sStart) <= Math.min(fEnd, sEnd);
+  });
+}
+
+function timeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
 }
 
 function App() {
@@ -72,6 +88,8 @@ function App() {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [filterStartTime, setFilterStartTime] = useState<string>("00:00");
+  const [filterEndTime, setFilterEndTime] = useState<string>("23:59");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
@@ -110,13 +128,11 @@ function App() {
       } else {
         const errorMsg = result.error || "";
         let helpText = "DB 설정을 확인해 주세요.";
-        
         if (errorMsg.includes("has_sauna")) {
           helpText = "Supabase SQL Editor에서 'ALTER TABLE pools ADD COLUMN has_sauna BOOLEAN DEFAULT false;' 명령어를 실행해 주세요.";
         } else if (errorMsg.includes("homepage_url")) {
           helpText = "Supabase SQL Editor에서 'ALTER TABLE pools ADD COLUMN homepage_url TEXT;' 명령어를 실행해 주세요.";
         }
-        
         alert(`저장에 실패했습니다.\n사유: ${errorMsg}\n\n[해결 방법]: ${helpText}`);
       }
     } catch (err: any) {
@@ -142,23 +158,30 @@ function App() {
   const handleLogoClick = () => {
     setView('list'); setDisplayMode('list'); setSelectedRegion('전체'); setSearchQuery('');
     setShowAvailableOnly(false); setSelectedDate(todayStr); setSelectedPoolDetail(null);
+    setFilterStartTime("00:00"); setFilterEndTime("23:59");
   };
 
   const isTodaySelected = selectedDate === todayStr;
   
-  // 필터 활성화 상태 체크 (배지 표시용)
   const isFilterActive = useMemo(() => {
-    return searchQuery !== "" || (selectedRegion !== "전체" && selectedRegion !== "내주변") || selectedDate !== todayStr || showAvailableOnly;
-  }, [searchQuery, selectedRegion, selectedDate, showAvailableOnly, todayStr]);
+    return searchQuery !== "" || 
+           (selectedRegion !== "전체" && selectedRegion !== "내주변") || 
+           selectedDate !== todayStr || 
+           showAvailableOnly ||
+           filterStartTime !== "00:00" ||
+           filterEndTime !== "23:59";
+  }, [searchQuery, selectedRegion, selectedDate, showAvailableOnly, todayStr, filterStartTime, filterEndTime]);
 
   const processedPools = useMemo(() => {
     const targetDateObj = new Date(selectedDate);
     let list = pools.map(p => ({
       ...p,
       distance: userLocation ? calculateDistance(userLocation.lat, userLocation.lng, p.lat, p.lng) : undefined,
-      isAvailable: isPoolAvailable(p, targetDateObj, isTodaySelected)
+      isAvailable: isPoolAvailableInTimeRange(p, targetDateObj, filterStartTime, filterEndTime)
     }));
+
     list = list.filter(p => view === 'private' ? p.isPublic === false : p.isPublic !== false);
+    
     if (view !== 'private') {
       if (selectedRegion === "내주변" && userLocation) {
         list = list.filter(p => p.distance !== undefined && p.distance <= 8);
@@ -169,14 +192,19 @@ function App() {
       } else if (userLocation) {
         list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
       }
-      if (showAvailableOnly) list = list.filter(p => p.isAvailable);
+      
+      // 필터링 적용 (시간대 가용 여부 기반)
+      if (showAvailableOnly || filterStartTime !== "00:00" || filterEndTime !== "23:59") {
+        list = list.filter(p => p.isAvailable);
+      }
     }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(p => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
     }
     return list;
-  }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate, isTodaySelected, view]);
+  }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate, filterStartTime, filterEndTime, isTodaySelected, view]);
 
   return (
     <div className={`flex flex-col font-sans bg-[#f8fafc] ${displayMode === 'map' && view === 'list' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
@@ -225,9 +253,16 @@ function App() {
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <div className="flex gap-1 items-center bg-slate-100 p-1 rounded-2xl">
-                    <div className="relative w-48">
+                    <div className="relative w-40">
                       <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-12 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none" />
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    </div>
+                    {/* 시간 선택 필터 추가 */}
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 h-12">
+                      <Clock4 className="w-4 h-4 text-slate-400 shrink-0" />
+                      <input type="time" value={filterStartTime} onChange={(e) => setFilterStartTime(e.target.value)} className="bg-transparent text-xs font-black outline-none w-16" />
+                      <span className="text-slate-300">~</span>
+                      <input type="time" value={filterEndTime} onChange={(e) => setFilterEndTime(e.target.value)} className="bg-transparent text-xs font-black outline-none w-16" />
                     </div>
                     <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`h-12 px-4 rounded-xl font-black text-sm flex items-center gap-2 transition-all ${!isTodaySelected ? 'bg-slate-200 text-slate-400' : (showAvailableOnly ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:text-slate-800')}`}><CalendarCheck size={18} /> 오늘가능</button>
                   </div>
@@ -304,23 +339,47 @@ function App() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">보기 방식 선택</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setDisplayMode('map')} className={`flex items-center justify-center gap-2 h-11 rounded-xl font-black text-xs transition-all border ${displayMode === 'map' ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}><MapIcon size={16} /> 지도 중심</button>
-                  <button onClick={() => setDisplayMode('list')} className={`flex items-center justify-center gap-2 h-11 rounded-xl font-black text-xs transition-all border ${displayMode === 'list' ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}><ListIcon size={16} /> 목록 중심</button>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">운영 일시 설정</label>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input 
+                      type="date" 
+                      value={selectedDate} 
+                      onChange={(e) => setSelectedDate(e.target.value)} 
+                      className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
+                    />
+                    <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  </div>
+                  {/* 모바일 시간 범위 선택 */}
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input 
+                        type="time" 
+                        value={filterStartTime} 
+                        onChange={(e) => setFilterStartTime(e.target.value)} 
+                        className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
+                      />
+                      <Clock4 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    </div>
+                    <span className="text-slate-300">~</span>
+                    <div className="relative flex-1">
+                      <input 
+                        type="time" 
+                        value={filterEndTime} 
+                        onChange={(e) => setFilterEndTime(e.target.value)} 
+                        className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
+                      />
+                      <Clock4 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">검색 기준일 설정</label>
-                <div className="relative">
-                  <input 
-                    type="date" 
-                    value={selectedDate} 
-                    onChange={(e) => setSelectedDate(e.target.value)} 
-                    className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
-                  />
-                  <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">보기 방식 선택</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setDisplayMode('map')} className={`flex items-center justify-center gap-2 h-11 rounded-xl font-black text-xs transition-all border ${displayMode === 'map' ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}><MapIcon size={16} /> 지도 중심</button>
+                  <button onClick={() => setDisplayMode('list')} className={`flex items-center justify-center gap-2 h-11 rounded-xl font-black text-xs transition-all border ${displayMode === 'list' ? 'bg-brand-600 border-brand-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500'}`}><ListIcon size={16} /> 목록 중심</button>
                 </div>
               </div>
 
@@ -343,7 +402,7 @@ function App() {
             {/* 오버레이 푸터 */}
             <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-2">
               <button 
-                onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setSelectedDate(todayStr); setShowAvailableOnly(false); }} 
+                onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setSelectedDate(todayStr); setShowAvailableOnly(false); setFilterStartTime("00:00"); setFilterEndTime("23:59"); }} 
                 className="flex-1 h-12 bg-white border border-slate-200 rounded-xl font-black text-xs text-slate-400 active:scale-95 transition-all"
               >
                 초기화
