@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy, ChevronRight, Settings2, Clock4 } from 'lucide-react';
+import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy, ChevronRight, Settings2, Clock4, ChevronDown } from 'lucide-react';
 import { Pool, Region } from './types';
 import { MOCK_POOLS, REGIONS } from './constants';
 import PoolCard from './components/PoolCard';
@@ -57,14 +57,12 @@ function isPoolAvailableInTimeRange(pool: Pool, targetDate: Date, filterStart: s
 
   if (possibleSchedules.length === 0) return false;
 
-  // 시간 필터링 (분 단위 변환 비교)
   const fStart = timeToMinutes(filterStart);
   const fEnd = timeToMinutes(filterEnd);
 
   return possibleSchedules.some(s => {
     const sStart = timeToMinutes(s.startTime);
     const sEnd = timeToMinutes(s.endTime);
-    // 운영 시간이 필터 범위와 겹치는지 확인 (교집합 존재 여부)
     return Math.max(fStart, sStart) <= Math.min(fEnd, sEnd);
   });
 }
@@ -91,6 +89,7 @@ function App() {
   const [filterStartTime, setFilterStartTime] = useState<string>("00:00");
   const [filterEndTime, setFilterEndTime] = useState<string>("23:59");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -158,19 +157,19 @@ function App() {
   const handleLogoClick = () => {
     setView('list'); setDisplayMode('list'); setSelectedRegion('전체'); setSearchQuery('');
     setShowAvailableOnly(false); setSelectedDate(todayStr); setSelectedPoolDetail(null);
-    setFilterStartTime("00:00"); setFilterEndTime("23:59");
+    setFilterStartTime("00:00"); setFilterEndTime("23:59"); setIsTimePickerOpen(false);
   };
 
   const isTodaySelected = selectedDate === todayStr;
+  const isTimeFilterApplied = filterStartTime !== "00:00" || filterEndTime !== "23:59";
   
   const isFilterActive = useMemo(() => {
     return searchQuery !== "" || 
            (selectedRegion !== "전체" && selectedRegion !== "내주변") || 
            selectedDate !== todayStr || 
            showAvailableOnly ||
-           filterStartTime !== "00:00" ||
-           filterEndTime !== "23:59";
-  }, [searchQuery, selectedRegion, selectedDate, showAvailableOnly, todayStr, filterStartTime, filterEndTime]);
+           isTimeFilterApplied;
+  }, [searchQuery, selectedRegion, selectedDate, showAvailableOnly, todayStr, isTimeFilterApplied]);
 
   const processedPools = useMemo(() => {
     const targetDateObj = new Date(selectedDate);
@@ -193,8 +192,7 @@ function App() {
         list.sort((a, b) => (a.distance || 0) - (b.distance || 0));
       }
       
-      // 필터링 적용 (시간대 가용 여부 기반)
-      if (showAvailableOnly || filterStartTime !== "00:00" || filterEndTime !== "23:59") {
+      if (showAvailableOnly || isTimeFilterApplied) {
         list = list.filter(p => p.isAvailable);
       }
     }
@@ -204,7 +202,7 @@ function App() {
       list = list.filter(p => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q));
     }
     return list;
-  }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate, filterStartTime, filterEndTime, isTodaySelected, view]);
+  }, [pools, userLocation, selectedRegion, showAvailableOnly, searchQuery, selectedDate, filterStartTime, filterEndTime, isTodaySelected, view, isTimeFilterApplied]);
 
   return (
     <div className={`flex flex-col font-sans bg-[#f8fafc] ${displayMode === 'map' && view === 'list' ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
@@ -252,18 +250,63 @@ function App() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <div className="flex gap-1 items-center bg-slate-100 p-1 rounded-2xl">
+                  <div className="flex gap-1 items-center bg-slate-100 p-1 rounded-2xl relative">
                     <div className="relative w-40">
                       <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-12 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none" />
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                     </div>
-                    {/* 시간 선택 필터 추가 */}
-                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 h-12">
-                      <Clock4 className="w-4 h-4 text-slate-400 shrink-0" />
-                      <input type="time" value={filterStartTime} onChange={(e) => setFilterStartTime(e.target.value)} className="bg-transparent text-xs font-black outline-none w-16" />
-                      <span className="text-slate-300">~</span>
-                      <input type="time" value={filterEndTime} onChange={(e) => setFilterEndTime(e.target.value)} className="bg-transparent text-xs font-black outline-none w-16" />
+                    
+                    {/* PC 전용 시간 드롭다운 버튼 */}
+                    <div className="relative">
+                      <button 
+                        onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
+                        className={`h-12 px-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all border ${isTimeFilterApplied ? 'bg-brand-50 border-brand-200 text-brand-600' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'}`}
+                      >
+                        <Clock4 size={18} />
+                        {isTimeFilterApplied && <span className="text-[10px] font-black">{filterStartTime}~{filterEndTime}</span>}
+                        <ChevronDown size={14} className={`transition-transform duration-200 ${isTimePickerOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {/* 시간 선택 드롭다운 패널 */}
+                      {isTimePickerOpen && (
+                        <>
+                          <div className="fixed inset-0 z-[60]" onClick={() => setIsTimePickerOpen(false)}></div>
+                          <div className="absolute top-[calc(100%+8px)] right-0 z-[70] bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 min-w-[220px] animate-in slide-in-from-top-2 duration-200">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                              <Clock4 size={12} /> 시간 범위 설정
+                            </h4>
+                            <div className="space-y-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <label className="text-[9px] font-black text-slate-400 mb-1 block">시작</label>
+                                  <input type="time" value={filterStartTime} onChange={(e) => setFilterStartTime(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-black outline-none focus:ring-2 focus:ring-brand-500" />
+                                </div>
+                                <span className="text-slate-300 mt-4">~</span>
+                                <div className="flex-1">
+                                  <label className="text-[9px] font-black text-slate-400 mb-1 block">종료</label>
+                                  <input type="time" value={filterEndTime} onChange={(e) => setFilterEndTime(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-black outline-none focus:ring-2 focus:ring-brand-500" />
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button 
+                                  onClick={() => { setFilterStartTime("00:00"); setFilterEndTime("23:59"); setIsTimePickerOpen(false); }}
+                                  className="flex-1 py-2 rounded-lg text-[10px] font-black text-slate-400 border border-slate-100 hover:bg-slate-50 transition-all"
+                                >
+                                  초기화
+                                </button>
+                                <button 
+                                  onClick={() => setIsTimePickerOpen(false)}
+                                  className="flex-1 py-2 bg-brand-600 text-white rounded-lg text-[10px] font-black shadow-md hover:bg-brand-700 transition-all"
+                                >
+                                  적용
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
+
                     <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`h-12 px-4 rounded-xl font-black text-sm flex items-center gap-2 transition-all ${!isTodaySelected ? 'bg-slate-200 text-slate-400' : (showAvailableOnly ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:text-slate-800')}`}><CalendarCheck size={18} /> 오늘가능</button>
                   </div>
                   <button onClick={handleNearMe} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'}`}><LocateFixed size={18} /> 내주변</button>
@@ -273,7 +316,7 @@ function App() {
                 </div>
               </div>
 
-              {/* 모바일 퀵 버튼 바 */}
+              {/* 모바일 퀵 버튼 바 (기존 유지) */}
               <div className="flex sm:hidden px-4 py-2.5 justify-center items-center gap-3">
                 <button onClick={handleNearMe} className={`flex-1 flex flex-col items-center justify-center h-12 rounded-xl transition-all border ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
                   <LocateFixed size={18} />
@@ -310,11 +353,10 @@ function App() {
         </>
       )}
 
-      {/* 모바일 전용 상세 검색 오버레이 */}
+      {/* 모바일 상세 검색 오버레이 (기존 유지) */}
       {isFilterOpen && (
         <div className="fixed inset-0 z-[150] flex items-end sm:hidden bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full bg-white rounded-t-[32px] shadow-2xl flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
-            {/* 오버레이 헤더 */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
               <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Settings2 className="text-brand-600 w-5 h-5" /> 상세 검색 설정
@@ -322,18 +364,11 @@ function App() {
               <button onClick={() => setIsFilterOpen(false)} className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-500"><X size={18} /></button>
             </div>
             
-            {/* 오버레이 본문 */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6 no-scrollbar">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">시설명 또는 주소 검색</label>
                 <div className="relative">
-                  <input 
-                    type="text" 
-                    value={searchQuery} 
-                    onChange={(e) => setSearchQuery(e.target.value)} 
-                    placeholder="수영장 이름을 입력하세요"
-                    className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-brand-500 focus:bg-white transition-all outline-none" 
-                  />
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="수영장 이름을 입력하세요" className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm focus:border-brand-500 focus:bg-white transition-all outline-none" />
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 </div>
               </div>
@@ -342,33 +377,17 @@ function App() {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">운영 일시 설정</label>
                 <div className="space-y-3">
                   <div className="relative">
-                    <input 
-                      type="date" 
-                      value={selectedDate} 
-                      onChange={(e) => setSelectedDate(e.target.value)} 
-                      className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
-                    />
+                    <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" />
                     <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                   </div>
-                  {/* 모바일 시간 범위 선택 */}
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1">
-                      <input 
-                        type="time" 
-                        value={filterStartTime} 
-                        onChange={(e) => setFilterStartTime(e.target.value)} 
-                        className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
-                      />
+                      <input type="time" value={filterStartTime} onChange={(e) => setFilterStartTime(e.target.value)} className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" />
                       <Clock4 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                     </div>
                     <span className="text-slate-300">~</span>
                     <div className="relative flex-1">
-                      <input 
-                        type="time" 
-                        value={filterEndTime} 
-                        onChange={(e) => setFilterEndTime(e.target.value)} 
-                        className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" 
-                      />
+                      <input type="time" value={filterEndTime} onChange={(e) => setFilterEndTime(e.target.value)} className="w-full h-12 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none" />
                       <Clock4 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                     </div>
                   </div>
@@ -387,32 +406,15 @@ function App() {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">지역별 필터</label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {REGIONS.map(r => (
-                    <button 
-                      key={r} 
-                      onClick={() => setSelectedRegion(r)}
-                      className={`h-9 rounded-lg font-black text-[10px] transition-all border ${selectedRegion === r ? 'bg-brand-50 border-brand-400 text-brand-600' : 'bg-slate-50 border-slate-50 text-slate-400'}`}
-                    >
-                      {r}
-                    </button>
+                    <button key={r} onClick={() => setSelectedRegion(r)} className={`h-9 rounded-lg font-black text-[10px] transition-all border ${selectedRegion === r ? 'bg-brand-50 border-brand-400 text-brand-600' : 'bg-slate-50 border-slate-50 text-slate-400'}`}>{r}</button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* 오버레이 푸터 */}
             <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-2">
-              <button 
-                onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setSelectedDate(todayStr); setShowAvailableOnly(false); setFilterStartTime("00:00"); setFilterEndTime("23:59"); }} 
-                className="flex-1 h-12 bg-white border border-slate-200 rounded-xl font-black text-xs text-slate-400 active:scale-95 transition-all"
-              >
-                초기화
-              </button>
-              <button 
-                onClick={() => setIsFilterOpen(false)} 
-                className="flex-[2] h-12 bg-brand-600 text-white rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all"
-              >
-                검색 결과 적용하기
-              </button>
+              <button onClick={() => { setSearchQuery(""); setSelectedRegion("전체"); setSelectedDate(todayStr); setShowAvailableOnly(false); setFilterStartTime("00:00"); setFilterEndTime("23:59"); }} className="flex-1 h-12 bg-white border border-slate-200 rounded-xl font-black text-xs text-slate-400 active:scale-95 transition-all">초기화</button>
+              <button onClick={() => setIsFilterOpen(false)} className="flex-[2] h-12 bg-brand-600 text-white rounded-xl font-black text-xs shadow-lg active:scale-95 transition-all">검색 결과 적용하기</button>
             </div>
           </div>
         </div>
