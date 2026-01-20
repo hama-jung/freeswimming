@@ -23,12 +23,12 @@ const PoolCard: React.FC<PoolCardProps> = ({ pool, onClick, distance }) => {
   const scheduleCount = pool.freeSwimSchedule.length;
 
   const PlaceholderImage = () => (
-    <div className="w-full h-full bg-gradient-to-br from-brand-500 to-brand-700 flex flex-col items-center justify-center text-white p-4">
-      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-4 backdrop-blur-sm border border-white/30">
-        <Waves size={24} className="sm:size-32" strokeWidth={2.5} />
+    <div className="w-full h-full bg-slate-50 flex flex-col items-center justify-center p-4 border-b border-slate-100">
+      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-4 border border-slate-100 shadow-sm">
+        <Waves size={24} className="sm:size-32 text-slate-200" strokeWidth={2.5} />
       </div>
-      <span className="text-xl sm:text-2xl font-black tracking-tight opacity-90">자유수영.kr</span>
-      <span className="text-[8px] sm:text-[10px] font-bold mt-2 opacity-50 uppercase tracking-[0.2em]">Ready for Swimming</span>
+      <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-300">자유수영.kr</span>
+      <span className="text-[8px] sm:text-[10px] font-bold mt-2 text-slate-300/60 uppercase tracking-[0.2em]">Ready for Swimming</span>
     </div>
   );
 
@@ -37,7 +37,7 @@ const PoolCard: React.FC<PoolCardProps> = ({ pool, onClick, distance }) => {
       onClick={() => onClick(pool)}
       className="bg-white rounded-2xl sm:rounded-[40px] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer overflow-hidden group"
     >
-      <div className="relative h-40 sm:h-64 overflow-hidden bg-slate-100">
+      <div className="relative h-40 sm:h-64 overflow-hidden bg-slate-50">
         {(!pool.imageUrl || imgError) ? (
           <PlaceholderImage />
         ) : (

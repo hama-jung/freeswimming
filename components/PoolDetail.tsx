@@ -81,12 +81,12 @@ const PoolDetail: React.FC<PoolDetailProps> = ({ pool, onClose, onUpdatePool, on
   };
 
   const PlaceholderDetail = () => (
-    <div className="w-full h-full bg-gradient-to-br from-brand-600 to-brand-800 flex flex-col items-center justify-center text-white p-6">
-      <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-md border border-white/20 mb-4 scale-110 sm:scale-125">
-        <Waves size={32} className="sm:size-48" strokeWidth={2.5} />
+    <div className="w-full h-full bg-slate-200 flex flex-col items-center justify-center p-6">
+      <div className="p-4 bg-white/40 rounded-2xl backdrop-blur-md border border-white/20 mb-4 scale-110 sm:scale-125 shadow-sm">
+        <Waves size={32} className="sm:size-48 text-slate-400" strokeWidth={2.5} />
       </div>
-      <h2 className="text-2xl sm:text-4xl font-black tracking-tight mb-2">자유수영.kr</h2>
-      <p className="text-white/40 font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-[8px] sm:text-xs">Premium Swimming Database</p>
+      <h2 className="text-2xl sm:text-4xl font-black tracking-tight mb-2 text-slate-400">자유수영.kr</h2>
+      <p className="text-slate-400/70 font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-[8px] sm:text-xs">Premium Swimming Database</p>
     </div>
   );
 
