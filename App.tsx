@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Waves, LocateFixed, CalendarCheck, Loader2, CheckCircle, MapPin, Info, Map as MapIcon, List as ListIcon, X, Plus, Calendar, Filter, EyeOff, ArrowLeft, Heart, AlertTriangle, Copy, ChevronRight, Settings2, Clock4, ChevronDown, Download } from 'lucide-react';
 import { Pool, Region } from './types';
@@ -281,23 +280,23 @@ function App() {
           <div className="bg-white border-b border-slate-100 z-40 sticky top-14 sm:top-20 shrink-0">
             <div className="max-w-[1280px] mx-auto">
               {/* 데스크탑 필터바 */}
-              <div className="hidden sm:flex px-6 py-4 gap-4 items-center border-b border-slate-50">
-                <div className="relative flex-1 max-md">
+              <div className="hidden sm:flex px-6 py-4 justify-between items-center border-b border-slate-50 gap-6">
+                <div className="relative w-96">
                   <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="어느 수영장을 찾으세요?" className="w-full pl-12 pr-4 h-14 bg-slate-50 border border-slate-200 rounded-2xl text-xl font-black focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all outline-none" />
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-6 h-6" />
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <div className="flex gap-1 items-center bg-slate-100 p-1 rounded-2xl relative">
-                    <div className="relative w-40">
-                      <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-12 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none" />
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <div className="flex gap-3 shrink-0">
+                  <div className="flex gap-2 items-center bg-slate-100 p-1.5 rounded-2xl relative">
+                    <div className="relative w-44">
+                      <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-full h-12 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-black outline-none cursor-pointer" />
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                     </div>
                     
                     {/* PC 전용 시간 드롭다운 버튼 */}
                     <div className="relative">
                       <button 
                         onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
-                        className={`h-12 px-3 rounded-xl font-black text-sm flex items-center gap-2 transition-all border ${isTimeFilterApplied ? 'bg-brand-50 border-brand-200 text-brand-600' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'}`}
+                        className={`h-12 px-4 rounded-xl font-black text-sm flex items-center gap-2 transition-all border ${isTimeFilterApplied ? 'bg-brand-50 border-brand-200 text-brand-600' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'}`}
                       >
                         <Clock4 size={18} />
                         {isTimeFilterApplied && <span className="text-[10px] font-black">{filterStartTime}~{filterEndTime}</span>}
@@ -347,7 +346,7 @@ function App() {
                     <button onClick={() => setShowAvailableOnly(!showAvailableOnly)} disabled={!isTodaySelected} className={`h-12 px-4 rounded-xl font-black text-sm flex items-center gap-2 transition-all ${!isTodaySelected ? 'bg-slate-200 text-slate-400' : (showAvailableOnly ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-600 hover:text-slate-800')}`}><CalendarCheck size={18} /> 오늘가능</button>
                   </div>
                   <button onClick={handleNearMe} className={`h-14 px-6 rounded-2xl font-black text-sm flex items-center gap-2 transition-all border-2 ${selectedRegion === "내주변" ? 'bg-brand-600 border-brand-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'}`}><LocateFixed size={18} /> 내주변</button>
-                  <select value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value as Region)} className="h-14 px-4 bg-white border border-slate-100 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-brand-500">
+                  <select value={selectedRegion} onChange={(e) => setSelectedRegion(e.target.value as Region)} className="h-14 px-4 bg-white border border-slate-100 rounded-2xl font-black text-sm outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer">
                     {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
