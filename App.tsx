@@ -98,6 +98,7 @@ function App() {
   const [filterEndTime, setFilterEndTime] = useState<string>("23:59");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -275,7 +276,18 @@ function App() {
       <header className="bg-white border-b border-slate-100 z-50 sticky top-0 shrink-0">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-14 sm:h-20 flex items-center justify-between">
           <button className="flex items-center gap-2 sm:gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
-            <img src="/icon-192.png" alt="자유수영 로고" className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl shadow-lg" />
+            {logoError ? (
+              <div className="w-8 h-8 sm:w-12 sm:h-12 bg-brand-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg text-white">
+                <Waves size={20} className="sm:w-7 sm:h-7" strokeWidth={2.5} />
+              </div>
+            ) : (
+              <img 
+                src="/icon-192.png" 
+                alt="자유수영 로고" 
+                className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl shadow-lg" 
+                onError={() => setLogoError(true)}
+              />
+            )}
             <h1 className="text-base sm:text-2xl font-black text-slate-900">자유수영.kr</h1>
           </button>
           <div className="flex items-center gap-2">
