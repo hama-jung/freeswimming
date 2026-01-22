@@ -27,8 +27,9 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 /**
  * 특정 수영장이 지정된 날짜와 시간 범위 내에 운영되는지 확인
+ * checkStartTimeOnly: true일 경우, 범위 내에 '시작'하는 스케줄이 있는지만 확인 (현재 시간 이후 일정 찾기용)
  */
-function isPoolAvailableInTimeRange(pool: Pool, targetDate: Date, filterStart: string, filterEnd: string): boolean {
+function isPoolAvailableInTimeRange(pool: Pool, targetDate: Date, filterStart: string, filterEnd: string, checkStartTimeOnly: boolean = false): boolean {
   const dayIndex = targetDate.getDay(); 
   const dayOfMonth = targetDate.getDate();
   const weekOfMonth = Math.ceil(dayOfMonth / 7);
@@ -62,7 +63,15 @@ function isPoolAvailableInTimeRange(pool: Pool, targetDate: Date, filterStart: s
   return possibleSchedules.some(s => {
     const sStart = timeToMinutes(s.startTime);
     const sEnd = timeToMinutes(s.endTime);
-    return Math.max(fStart, sStart) <= Math.min(fEnd, sEnd);
+
+    if (checkStartTimeOnly) {
+      // '오늘 가능' 모드: 현재 시간(filterStart) 이후에 시작하는 스케줄이 있는지 확인
+      // 예: 지금 10:30이면 10:30 이후에 시작하는 타임이 있어야 함.
+      return sStart >= fStart;
+    } else {
+      // 일반 모드: 시간대가 겹치는지 확인 (Overlap Check)
+      return Math.max(fStart, sStart) <= Math.min(fEnd, sEnd);
+    }
   });
 }
 
@@ -197,11 +206,36 @@ function App() {
   }, [searchQuery, selectedRegion, selectedDate, showAvailableOnly, todayStr, isTimeFilterApplied]);
 
   const processedPools = useMemo(() => {
-    const targetDateObj = new Date(selectedDate);
+    // 필터 조건 결정 로직
+    const now = new Date();
+    
+    let checkDateObj: Date;
+    let checkStartTime: string;
+    let checkEndTime: string;
+    let checkStartTimeOnly = false; // true면 '시작시간이 이후인 것'만 체크
+
+    if (showAvailableOnly) {
+      // '오늘 가능' 모드: 
+      // 1. 날짜는 무조건 '오늘' (선택된 날짜 무시)
+      // 2. 시간은 '현재 시간' 이후에 시작하는 것
+      checkDateObj = now;
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      checkStartTime = `${h}:${m}`;
+      checkEndTime = "23:59";
+      checkStartTimeOnly = true;
+    } else {
+      // 일반 모드: 선택된 날짜와 시간 범위 사용
+      checkDateObj = new Date(selectedDate);
+      checkStartTime = filterStartTime;
+      checkEndTime = filterEndTime;
+      checkStartTimeOnly = false;
+    }
+
     let list = pools.map(p => ({
       ...p,
       distance: userLocation ? calculateDistance(userLocation.lat, userLocation.lng, p.lat, p.lng) : undefined,
-      isAvailable: isPoolAvailableInTimeRange(p, targetDateObj, filterStartTime, filterEndTime)
+      isAvailable: isPoolAvailableInTimeRange(p, checkDateObj, checkStartTime, checkEndTime, checkStartTimeOnly)
     }));
 
     list = list.filter(p => view === 'private' ? p.isPublic === false : p.isPublic !== false);
