@@ -275,9 +275,7 @@ function App() {
       <header className="bg-white border-b border-slate-100 z-50 sticky top-0 shrink-0">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-14 sm:h-20 flex items-center justify-between">
           <button className="flex items-center gap-2 sm:gap-3 group cursor-pointer focus:outline-none" onClick={handleLogoClick}>
-            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-brand-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg">
-              <Waves size={20} className="sm:size-6" strokeWidth={2.5} />
-            </div>
+            <img src="/icon-192.png" alt="자유수영 로고" className="w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl shadow-lg" />
             <h1 className="text-base sm:text-2xl font-black text-slate-900">자유수영.kr</h1>
           </button>
           <div className="flex items-center gap-2">
